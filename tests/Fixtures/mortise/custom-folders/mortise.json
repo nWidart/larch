@@ -1,0 +1,9 @@
+{
+    "team": "shop",
+    "rules": {
+        "no-circular-use": false,
+        "public-surface-only": {
+            "folders": ["contracts", "Money"]
+        }
+    }
+}

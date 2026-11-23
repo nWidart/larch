@@ -20,10 +20,12 @@ final readonly class Rules
 {
     /**
      * @param  list<EdgeKind>  $kinds  the kinds of link the rules check
+     * @param  list<string>|null  $publicApi  instead of the namespaces set with larch()->publicApi()
      */
     public function __construct(
         private Larch $larch,
         private array $kinds = [EdgeKind::Import],
+        private ?array $publicApi = null,
     ) {}
 
     /**
@@ -57,7 +59,7 @@ final readonly class Rules
             }
 
             if (isset($api[$link->toModule])) {
-                if (! $this->larch->isPublic($link->toClass, $link->toModule)) {
+                if (! $this->larch->isPublic($link->toClass, $link->toModule, $this->publicApi)) {
                     $violations[] = new Violation($link, $this->internalReason($link));
                 }
 
@@ -91,7 +93,7 @@ final readonly class Rules
         $violations = [];
 
         foreach ($this->linksFrom($modules) as $link) {
-            if (! $this->larch->isPublic($link->toClass, $link->toModule)) {
+            if (! $this->larch->isPublic($link->toClass, $link->toModule, $this->publicApi)) {
                 $violations[] = new Violation($link, $this->internalReason($link));
             }
         }
@@ -213,7 +215,7 @@ final readonly class Rules
 
     private function internalReason(ModuleLink $link): string
     {
-        $namespaces = $this->larch->publicApiNamespaces();
+        $namespaces = $this->publicApi ?? $this->larch->publicApiNamespaces();
         $api = $namespaces === [] ? 'empty' : implode(', ', $namespaces);
 
         return "It is internal to {$link->toModule}. The public API of a module is: {$api}.";

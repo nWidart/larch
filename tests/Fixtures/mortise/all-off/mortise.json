@@ -1,0 +1,9 @@
+{
+    "rules": {
+        "no-circular-use": false,
+        "public-surface-only": {
+            "enabled": false,
+            "folders": ["Contracts", "Events"]
+        }
+    }
+}

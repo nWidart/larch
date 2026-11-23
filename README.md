@@ -160,6 +160,35 @@ Module Billing may only depend on Shared, Catalog (public API). 1 link breaks it
     It is internal to Catalog. The public API of a module is: Contracts, Events.
 ```
 
+## Rules set in Mortise
+
+[Mortise](https://github.com/nwidart/mortise), the desktop app for laravel-modules, keeps its boundary rules in `mortise.json` in the app folder. Run them in CI with the preset:
+
+```php
+// tests/Arch/MortiseTest.php
+arch()->preset()->mortise();
+```
+
+The preset reads `mortise.json` at the project root, as Mortise reads it:
+
+```json
+{
+    "rules": {
+        "no-circular-use": true,
+        "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] }
+    }
+}
+```
+
+- `no-circular-use` is `toHaveNoCycles()` on every module.
+- `public-surface-only` is `toOnlyUsePublicApis()` on every module, with the folders of the file as the public API. A folder matches the first namespace inside a module, in any case.
+- Without the file, or without a key, the default applies: both rules on, folders `Contracts` and `Events`.
+- A file Larch cannot read stops the test. Mortise uses the defaults then; CI should not pass on rules nobody wrote.
+- A preset is one Pest test. Both rules run in it, and the failure lists the breaks of each rule under its name.
+- The rules check imports, as Mortise does.
+
+`tests/Fixtures/mortise` holds small apps with the result each one expects, so Mortise and Larch can check they agree.
+
 ## Baseline
 
 An existing app breaks rules on its first run. A baseline accepts today's violations, so a test fails only on new ones.

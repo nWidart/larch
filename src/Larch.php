@@ -223,12 +223,20 @@ final class Larch
         return $found;
     }
 
-    public function isPublic(string $class, string $module): bool
+    /**
+     * Whether the class is in one of the public namespaces of its module.
+     * PHP namespaces ignore case, and so does this.
+     *
+     * @param  list<string>|null  $publicApi  instead of the namespaces set with publicApi()
+     */
+    public function isPublic(string $class, string $module, ?array $publicApi = null): bool
     {
         $namespace = $this->namespaceOf($module);
 
-        foreach ($this->publicApi as $api) {
-            if (str_starts_with($class, $namespace.'\\'.$api.'\\')) {
+        foreach ($publicApi ?? $this->publicApi as $api) {
+            $prefix = $namespace.'\\'.trim($api, '\\').'\\';
+
+            if (strncasecmp($class, $prefix, strlen($prefix)) === 0) {
                 return true;
             }
         }
@@ -473,7 +481,7 @@ final class Larch
         return array_values(array_unique($paths));
     }
 
-    private function projectRoot(): string
+    public function projectRoot(): string
     {
         if ($this->root !== null) {
             return $this->root;

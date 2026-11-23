@@ -7,6 +7,7 @@ namespace Nwidart\Larch;
 use Nwidart\Larch\Baseline\Baseline;
 use Nwidart\Larch\Exceptions\LarchException;
 use Nwidart\Larch\Graph\EdgeKind;
+use Nwidart\Larch\Mortise\MortiseConfig;
 use Nwidart\Larch\Rules\AppRules;
 use Nwidart\Larch\Rules\Breach;
 use Nwidart\Larch\Rules\Result;
@@ -16,6 +17,7 @@ use Nwidart\Larch\Subjects\Listeners;
 use Nwidart\Larch\Subjects\Models;
 use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\Modules;
+use Nwidart\Larch\Subjects\MortiseRules;
 use Nwidart\Larch\Subjects\PublicApi;
 use Nwidart\Larch\Subjects\Routes;
 use Pest\Expectation;
@@ -148,6 +150,32 @@ final class Expectations
         }
 
         self::assert(self::appRules()->beInMorphMap($subject));
+    }
+
+    /**
+     * The rules of mortise.json, checked on imports, as Mortise checks them.
+     */
+    public static function toFollowMortiseRules(mixed $subject): void
+    {
+        if (! $subject instanceof MortiseRules) {
+            throw self::wrongSubject('toFollowMortiseRules', 'the mortise preset', $subject);
+        }
+
+        $larch = Larch::instance();
+        $config = MortiseConfig::read($larch->projectRoot());
+        $modules = array_keys($larch->moduleMap());
+        $rules = new Rules($larch, [EdgeKind::Import], $config->folders);
+        $results = [];
+
+        if ($config->noCircularUse) {
+            $results['mortise.json, no-circular-use:'] = $rules->noCycles($modules);
+        }
+
+        if ($config->publicSurfaceOnly) {
+            $results['mortise.json, public-surface-only:'] = $rules->onlyUsePublicApis($modules);
+        }
+
+        self::assert(Result::combine($results));
     }
 
     /**
