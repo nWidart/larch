@@ -30,6 +30,7 @@ final readonly class Rules
      * The module uses only the given modules, or their public API.
      *
      * @param  list<Module|PublicApi>  $targets
+     * @return Result<Violation>
      */
     public function onlyDependOn(Module $subject, array $targets): Result
     {
@@ -67,7 +68,7 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return Result::passed();
+            return new Result([], fn (): string => '');
         }
 
         $allowed = array_merge(
@@ -83,6 +84,7 @@ final readonly class Rules
      * The given modules use other modules only through their public API.
      *
      * @param  list<string>  $modules
+     * @return Result<Violation>
      */
     public function onlyUsePublicApis(array $modules): Result
     {
@@ -95,7 +97,7 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return Result::passed();
+            return new Result([], fn (): string => '');
         }
 
         $who = count($modules) === 1 ? "Module {$modules[0]} uses" : 'Modules use';
@@ -107,6 +109,7 @@ final readonly class Rules
      * No module uses another that, directly or not, uses it back.
      *
      * @param  list<string>  $modules  report only cycles that hold one of these
+     * @return Result<Violation>
      */
     public function noCycles(array $modules): Result
     {
@@ -135,7 +138,7 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return Result::passed();
+            return new Result([], fn (): string => '');
         }
 
         // A cycle is reported when one of its links is new, with all its links.
@@ -152,6 +155,7 @@ final readonly class Rules
      * No class of the module listens to an event of the target modules.
      *
      * @param  list<Module>  $targets
+     * @return Result<Violation>
      */
     public function ignoreEventsOf(Module $subject, array $targets): Result
     {
@@ -172,7 +176,7 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return Result::passed();
+            return new Result([], fn (): string => '');
         }
 
         $list = implode(', ', $names);

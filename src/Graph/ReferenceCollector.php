@@ -44,6 +44,9 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     private const array BIND_METHODS = ['bind', 'bindif', 'singleton', 'singletonif', 'scoped', 'scopedif', 'instance'];
 
+    /** Relations that store the class of the model that declares them. */
+    private const array MORPH_OWN = ['morphone', 'morphmany', 'morphtomany'];
+
     /** The App facade, and its default alias. */
     private const array APP_FACADES = ['Illuminate\Support\Facades\App', 'App'];
 
@@ -64,6 +67,9 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     /** @var array<string, int> container key => line that binds it */
     public array $bindings = [];
+
+    /** @var array<string, true> models whose class name a morph relation stores */
+    public array $morphs = [];
 
     /** @var list<string> */
     private array $classStack = [];
@@ -207,6 +213,14 @@ final class ReferenceCollector extends NodeVisitorAbstract
             }
 
             return;
+        }
+
+        if ($this->classStack !== [] && $call->var instanceof Variable && $call->var->name === 'this') {
+            if (in_array($method, self::MORPH_OWN, true)) {
+                $this->morphs[$this->currentClass()] = true;
+            } elseif ($method === 'morphedbymany' && ($related = $this->key($argument)) !== null) {
+                $this->morphs[$related] = true;
+            }
         }
 
         if (in_array($method, self::CONTAINER_METHODS, true) && $this->classStack !== [] && $this->isContainer($call->var)) {

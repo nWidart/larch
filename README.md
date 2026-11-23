@@ -107,6 +107,48 @@ How Larch reads the app:
     Billing may not depend on Inventory.
 ```
 
+## App rules
+
+The booted app also holds routes, policies, jobs, listeners and the morph map. Rules on them read like the module rules:
+
+```php
+use Illuminate\Database\Eloquent\Relations\Pivot;
+
+use function Nwidart\Larch\larch;
+
+arch('api routes need auth')
+    ->expect(larch()->routes()->prefixed('api')->except('api/webhooks/*', 'api/health'))
+    ->toUseMiddleware('auth:sanctum');
+
+arch('every model has a policy')
+    ->expect(larch()->models()->except(Pivot::class))
+    ->toHavePolicy();
+
+arch('queued jobs set retry limits')
+    ->expect(larch()->jobs()->queued())
+    ->toDefine('tries', 'timeout');
+
+arch('listeners on billing events are queued')
+    ->expect(larch()->listenersOf('Modules\Billing\Events\*'))
+    ->toBeQueued();
+
+arch('polymorphic models are in the morph map')
+    ->expect(larch()->models()->usedInMorphs())
+    ->toBeInMorphMap();
+```
+
+| Subject | Narrow with | Expectation | Fails when |
+|---|---|---|---|
+| `larch()->routes()` | `prefixed('api')`, `named('admin.*')`, `except('api/health', 'admin.login')` | `toUseMiddleware(...$middleware)` | A route does not run one of the middleware. Give a name with its parameters (`auth:sanctum`), a group (`api`) or a class. |
+| `larch()->models()` | `except(Pivot::class, 'App\Legacy\*')` | `toHavePolicy()` | Laravel finds no policy for a model, registered with `Gate::policy()` or found by name. |
+| `larch()->jobs()` | `queued()` | `toDefine(...$members)` | A job declares none of a property or a method with the name. |
+| `larch()->listenersOf(...$events)` | | `toBeQueued()` | A listener of a matching event does not implement `ShouldQueue`. Closure listeners are skipped. |
+| `larch()->models()` | `usedInMorphs()` | `toBeInMorphMap()` | A model that a morph relation stores by class has no alias in the morph map. |
+
+- Models are the classes Larch reads that extend `Model`. Jobs are the classes that use the `Dispatchable` trait of the bus.
+- `usedInMorphs()` keeps the models that declare `morphOne`, `morphMany` or `morphToMany`, and the models named in `morphedByMany`.
+- The baseline works for app rules too. A route's entry names its methods and URI; a class's entry names the class.
+
 ## What a failure looks like
 
 ```

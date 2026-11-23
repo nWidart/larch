@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nwidart\Larch\Baseline;
 
-use Nwidart\Larch\Rules\Violation;
+use Nwidart\Larch\Rules\Breach;
 use Pest\Contracts\HasPrintableTestCaseName;
 use Pest\Exceptions\InvalidPestCommand;
 use Pest\TestSuite;
@@ -55,8 +55,10 @@ final class Baseline
      *
      * Outside a Pest test, nothing is accepted or recorded.
      *
-     * @param  list<Violation>  $violations
-     * @return list<Violation>
+     * @template T of Breach
+     *
+     * @param  list<T>  $violations
+     * @return list<T>
      */
     public static function check(string $file, array $violations): array
     {
@@ -71,7 +73,7 @@ final class Baseline
         self::$seen[$file][$name] ??= [];
 
         foreach ($violations as $violation) {
-            $fingerprint = $violation->link->fingerprint();
+            $fingerprint = $violation->fingerprint();
             self::$seen[$file][$name][$fingerprint->key()] = $fingerprint;
         }
 
@@ -82,7 +84,7 @@ final class Baseline
         $accepted = self::entries($file)[$name] ?? [];
         $new = array_values(array_filter(
             $violations,
-            fn (Violation $violation): bool => ! isset($accepted[$violation->link->fingerprint()->key()]),
+            fn (Breach $violation): bool => ! isset($accepted[$violation->fingerprint()->key()]),
         ));
 
         self::$matched[$file] = (self::$matched[$file] ?? 0) + count($violations) - count($new);

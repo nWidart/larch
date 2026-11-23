@@ -15,6 +15,7 @@ final readonly class Graph
      * @param  list<CallSite>  $calls  calls the runtime pass resolves
      * @param  array<string, string>  $bindings  container key => where code binds it, "file:line"
      * @param  array<string, int>  $lines  class name => line of its declaration
+     * @param  list<string>  $morphs  models whose class name a morph relation stores
      */
     public function __construct(
         public array $classes,
@@ -22,6 +23,7 @@ final readonly class Graph
         public array $calls = [],
         public array $bindings = [],
         public array $lines = [],
+        public array $morphs = [],
     ) {}
 
     public function has(string $class): bool
@@ -34,7 +36,7 @@ final readonly class Graph
      */
     public function withEdges(array $edges): self
     {
-        return new self($this->classes, [...$this->edges, ...$edges], $this->calls, $this->bindings, $this->lines);
+        return new self($this->classes, [...$this->edges, ...$edges], $this->calls, $this->bindings, $this->lines, $this->morphs);
     }
 
     /**

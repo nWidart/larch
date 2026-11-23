@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Events\Dispatcher;
-use Illuminate\Foundation\Bootstrap\HandleExceptions;
 use Illuminate\Support\Facades\Facade;
 use Nwidart\Larch\Edge;
 use Nwidart\Larch\Exceptions\LarchException;
@@ -29,22 +28,9 @@ use function Nwidart\Larch\module;
  * boots it from tests/Fixtures/wired/bootstrap/app.php.
  */
 
-function wired(): Larch
-{
-    return Larch::reset()
-        ->root(__DIR__.'/../Fixtures/wired')
-        ->paths('Modules')
-        ->modules('Wired\*');
-}
-
 beforeEach(fn () => wired());
 
-afterEach(function () {
-    HandleExceptions::flushState($this);
-    Facade::clearResolvedInstances();
-    Facade::setFacadeApplication(null);
-    Container::setInstance(null);
-});
+afterEach(fn () => forgetApp($this));
 
 it('sees only imports by default', function () {
     expect(module('Billing'))->toOnlyDependOn(module('Catalog'), module('Shared'), module('Shipping'));
