@@ -67,6 +67,11 @@
             "plugins": [
                 "Nwidart\\Larch\\Plugin"
             ]
+        },
+        "laravel": {
+            "providers": [
+                "Nwidart\\Larch\\LarchServiceProvider"
+            ]
         }
     },
     "minimum-stability": "stable",

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Larch module graph</title>
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #fff; --fg: #17202b; --muted: #5b6676; --line: #d9dee6;
+  --accent: #2b55c9; --bad: #c2362b; --bad-soft: #fbe6e3;
+  --import: #7d8899; --facade: #b86a1f; --container: #8a3fb8; --event: #16807f; --job: #b8487a;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f141b; --surface: #171e28; --fg: #e4e9f0; --muted: #98a3b3; --line: #2a3442;
+    --accent: #86a6ff; --bad: #ff8a80; --bad-soft: #3a1c1a;
+    --import: #8a95a6; --facade: #f0a35e; --container: #c79bf2; --event: #5cc9c9; --job: #ee86b4;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 1.5rem; margin: 0; }
+h2 { font-size: 1.05rem; margin: 0 0 8px; }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--mono); font-size: .85em; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+.chip { font: inherit; font-size: .82rem; display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="false"] { opacity: .45; }
+.chip i { width: 12px; height: 3px; border-radius: 2px; display: block; }
+.chip:focus-visible, .edge-hit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.graph-scroll { overflow-x: auto; }
+svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.node rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+.node text { fill: var(--fg); font-weight: 600; font-size: 14px; }
+.node .sub { fill: var(--muted); font-weight: 400; font-size: 11px; font-family: var(--mono); }
+.edge { fill: none; stroke-width: 2; }
+.edge.internal { stroke-dasharray: 6 4; stroke-width: 2.5; }
+.edge.sel { stroke-width: 4; }
+.edge-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.off { display: none; }
+#detail { padding: 12px 14px; border-top: 1px solid var(--line); min-height: 56px; }
+#detail ul { margin: 6px 0 0; padding-left: 18px; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+td { overflow-wrap: anywhere; }
+.pill { font-family: var(--mono); font-size: .72rem; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.bad { color: var(--bad); }
+.empty { padding: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Module graph</h1>
+    <p class="muted" id="summary"></p>
+  </header>
+
+  <section class="box" aria-label="Graph">
+    <div class="tools" id="tools"><span class="muted">Kinds of link</span></div>
+    <div class="graph-scroll"><svg id="graph" role="img" aria-label="Modules and the links between them"><defs id="defs"></defs><g id="edges"></g><g id="nodes"></g></svg></div>
+    <div id="detail"><span class="muted">Select a link. A dashed red link reaches a class outside the public API of its module.</span></div>
+  </section>
+
+  <section class="box" aria-label="Links">
+    <div class="tools"><h2 style="margin:0">Links</h2><span class="muted" id="link-count"></span></div>
+    <div class="tbl"><table><thead><tr><th>From</th><th>To</th><th>Kind</th><th>Where</th></tr></thead><tbody id="links"></tbody></table></div>
+  </section>
+
+  <section class="box" aria-label="Unknown links">
+    <div class="tools"><h2 style="margin:0">Links Larch cannot follow</h2></div>
+    <div class="tbl"><table><thead><tr><th>Where</th><th>Class</th><th>Why</th></tr></thead><tbody id="unknown"></tbody></table></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var data = /*LARCH_DATA*/null;
+  var colors = { "import": "--import", facade: "--facade", container: "--container", event: "--event", job: "--job" };
+  var NS = "http://www.w3.org/2000/svg";
+  var on = {};
+  data.kinds.forEach(function (kind) { on[kind] = true; });
+
+  function el(tag, attrs, parent, text) {
+    var node = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    if (text !== undefined) node.textContent = text;
+    if (parent) parent.appendChild(node);
+    return node;
+  }
+  function html(tag, text, className) {
+    var node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+  function place(p) { return p.line > 0 ? p.file + ":" + p.line : p.file; }
+  function color(kind, internal) { return "var(" + (internal ? "--bad" : colors[kind] || "--import") + ")"; }
+
+  var internal = data.links.filter(function (link) { return !link.public; }).length;
+  document.getElementById("summary").textContent =
+    data.modules.length + " modules, " + data.links.length + " links between them, " + internal +
+    " to classes outside a public API, " + data.unknown.length + " Larch cannot follow. Kinds read: " + data.kinds.join(", ") +
+    ". Public API: " + (data.publicApi.join(", ") || "none") + ".";
+
+  // One edge per pair of modules and kind.
+  var pairs = {};
+  data.links.forEach(function (link) {
+    var key = link.fromModule + "|" + link.toModule + "|" + link.kind;
+    pairs[key] = pairs[key] || { from: link.fromModule, to: link.toModule, kind: link.kind, links: [], internal: false };
+    pairs[key].links.push(link);
+    if (!link.public) pairs[key].internal = true;
+  });
+
+  // Modules on a circle.
+  var W = 150, H = 50, n = data.modules.length;
+  var radius = Math.max(150, n * 34), size = radius * 2 + W + 40, center = size / 2;
+  var svg = document.getElementById("graph");
+  var positions = {}, bottom = 0;
+  data.modules.forEach(function (module, i) {
+    var angle = -Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1);
+    positions[module.name] = { x: center + radius * Math.cos(angle), y: center - 20 + radius * Math.sin(angle) };
+    bottom = Math.max(bottom, positions[module.name].y);
+  });
+  svg.setAttribute("viewBox", "0 0 " + size + " " + Math.min(size, bottom + H / 2 + 30));
+
+  var defs = document.getElementById("defs");
+  Object.keys(colors).concat(["bad"]).forEach(function (kind) {
+    var marker = el("marker", { id: "m-" + kind, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", style: "fill:" + color(kind, kind === "bad") }, marker);
+  });
+
+  function border(c, tx, ty) {
+    var dx = tx - c.x, dy = ty - c.y;
+    var sx = dx === 0 ? Infinity : (W / 2 + 4) / Math.abs(dx);
+    var sy = dy === 0 ? Infinity : (H / 2 + 4) / Math.abs(dy);
+    var s = Math.min(sx, sy);
+    return { x: c.x + dx * s, y: c.y + dy * s };
+  }
+
+  var edges = document.getElementById("edges"), detail = document.getElementById("detail"), drawn = [];
+  var kindsOf = {};
+  Object.keys(pairs).forEach(function (key) {
+    var pair = pairs[key], a = positions[pair.from], b = positions[pair.to];
+    var lane = (kindsOf[pair.from + "|" + pair.to] = (kindsOf[pair.from + "|" + pair.to] || 0) + 1);
+    var bend = 18 + lane * 14;
+    var dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    var cx = (a.x + b.x) / 2 - dy / len * bend, cy = (a.y + b.y) / 2 + dx / len * bend;
+    var p1 = border(a, cx, cy), p2 = border(b, cx, cy);
+    var d = "M" + p1.x + "," + p1.y + " Q" + cx + "," + cy + " " + p2.x + "," + p2.y;
+    var path = el("path", { d: d, "class": "edge" + (pair.internal ? " internal" : ""), style: "stroke:" + color(pair.kind, pair.internal), "marker-end": "url(#m-" + (pair.internal ? "bad" : pair.kind) + ")" }, edges);
+    var hit = el("path", { d: d, "class": "edge-hit", tabindex: "0", role: "button", "aria-label": pair.from + " to " + pair.to + ", " + pair.kind }, edges);
+    function select() {
+      drawn.forEach(function (one) { one.path.classList.remove("sel"); });
+      path.classList.add("sel");
+      detail.textContent = "";
+      var head = html("div");
+      head.appendChild(html("strong", pair.from + " → " + pair.to + " "));
+      var pill = html("span", pair.kind + " · " + pair.links.length + (pair.links.length === 1 ? " link" : " links"), "pill");
+      pill.style.color = color(pair.kind, pair.internal);
+      head.appendChild(pill);
+      detail.appendChild(head);
+      var list = html("ul");
+      pair.links.forEach(function (link) {
+        var item = html("li", link.from + " → " + link.to + " (" + place(link.places[0]) + ")" + (link.public ? "" : ", internal"));
+        item.className = "mono" + (link.public ? "" : " bad");
+        list.appendChild(item);
+      });
+      detail.appendChild(list);
+    }
+    hit.addEventListener("click", select);
+    hit.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
+    drawn.push({ path: path, hit: hit, kind: pair.kind });
+  });
+
+  var nodes = document.getElementById("nodes");
+  data.modules.forEach(function (module) {
+    var p = positions[module.name], g = el("g", { "class": "node" }, nodes);
+    el("rect", { x: p.x - W / 2, y: p.y - H / 2, width: W, height: H, rx: 8 }, g);
+    el("text", { x: p.x, y: p.y - 2, "text-anchor": "middle" }, g, module.name);
+    el("text", { x: p.x, y: p.y + 15, "text-anchor": "middle", "class": "sub" }, g, module.classes + (module.classes === 1 ? " class" : " classes"));
+  });
+
+  var tools = document.getElementById("tools");
+  data.kinds.forEach(function (kind) {
+    var button = html("button", undefined, "chip");
+    button.type = "button";
+    button.setAttribute("aria-pressed", "true");
+    var swatch = html("i");
+    swatch.style.background = color(kind, false);
+    button.appendChild(swatch);
+    button.appendChild(document.createTextNode(kind));
+    button.addEventListener("click", function () {
+      on[kind] = !on[kind];
+      button.setAttribute("aria-pressed", String(on[kind]));
+      drawn.forEach(function (one) {
+        if (one.kind === kind) { one.path.classList.toggle("off", !on[kind]); one.hit.classList.toggle("off", !on[kind]); }
+      });
+      renderLinks();
+    });
+    tools.appendChild(button);
+  });
+
+  function renderLinks() {
+    var body = document.getElementById("links"), shown = 0;
+    body.textContent = "";
+    data.links.forEach(function (link) {
+      if (!on[link.kind]) return;
+      shown++;
+      var row = html("tr");
+      row.appendChild(html("td", link.from, "mono"));
+      var to = html("td", link.to + (link.public ? "" : " (internal)"), "mono" + (link.public ? "" : " bad"));
+      row.appendChild(to);
+      var kind = html("td");
+      var pill = html("span", link.kind, "pill");
+      pill.style.color = color(link.kind, false);
+      kind.appendChild(pill);
+      row.appendChild(kind);
+      var where = place(link.places[0]) + (link.places.length > 1 ? " and " + (link.places.length - 1) + " more" : "");
+      if (link.through) where += ", through " + link.through;
+      if (link.boundIn) where += (link.through ? ", bound in " : ", registered in ") + link.boundIn;
+      row.appendChild(html("td", where, "mono"));
+      body.appendChild(row);
+    });
+    if (shown === 0) {
+      var empty = html("tr"), cell = html("td", "No links of the kinds shown.", "empty muted");
+      cell.colSpan = 4;
+      empty.appendChild(cell);
+      body.appendChild(empty);
+    }
+    document.getElementById("link-count").textContent = shown + " shown";
+  }
+  renderLinks();
+
+  var unknown = document.getElementById("unknown");
+  if (data.unknown.length === 0) {
+    var none = html("tr"), cell = html("td", "None.", "empty muted");
+    cell.colSpan = 3;
+    none.appendChild(cell);
+    unknown.appendChild(none);
+  }
+  data.unknown.forEach(function (edge) {
+    var row = html("tr");
+    row.appendChild(html("td", edge.file + ":" + edge.line, "mono"));
+    row.appendChild(html("td", edge.from, "mono"));
+    row.appendChild(html("td", edge.reason + (edge.boundIn ? " (bound in " + edge.boundIn + ")" : "")));
+    unknown.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>
