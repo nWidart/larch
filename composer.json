@@ -1,0 +1,64 @@
+{
+    "name": "nwidart/larch",
+    "description": "Architecture rules for Laravel apps that see facades, the container, events and routes. A Pest plugin.",
+    "keywords": [
+        "laravel",
+        "pest",
+        "pest-plugin",
+        "architecture",
+        "arch",
+        "modules",
+        "boundaries"
+    ],
+    "homepage": "https://github.com/nwidart/larch",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com",
+            "homepage": "https://nwidart.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5.7",
+        "pestphp/pest": "^4.3|^5.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.20",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nwidart\\Larch\\": "src"
+        },
+        "files": [
+            "src/functions.php",
+            "src/Autoload.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nwidart\\Larch\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "format": "pint",
+        "lint": "pint --test",
+        "analyse": "phpstan analyse --memory-limit=1G"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.x-dev"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
