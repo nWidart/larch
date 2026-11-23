@@ -72,6 +72,40 @@ Module Billing may only depend on Shared, Catalog (public API). 1 link breaks it
     It is internal to Catalog. The public API of a module is: Contracts, Events.
 ```
 
+## Baseline
+
+An existing app breaks rules on its first run. A baseline accepts today's violations, so a test fails only on new ones.
+
+```bash
+./vendor/bin/pest tests/Arch --update-larch-baseline
+```
+
+This writes `larch-baseline.json` at the project root. Commit it. Each entry is a test name and a fingerprint: the class that uses, the class it uses, and the kind of link. There is no line number, so an edit above a call does not make its violation new.
+
+```json
+{
+    "version": 1,
+    "tests": {
+        "Tests\\Arch\\ModulesTest > billing uses only shared": [
+            {
+                "from": "Modules\\Billing\\Actions\\ChargeOrder",
+                "to": "Modules\\Catalog\\Pricing\\PriceEngine",
+                "kind": "import"
+            }
+        ]
+    }
+}
+```
+
+With a baseline:
+
+- A test fails only on violations that are not in it. The failure message says how many more are in the baseline.
+- After the tests, Pest prints how many violations the baseline accepted, and lists the entries that no violation matches any more. The next `--update-larch-baseline` removes them.
+- `--update-larch-baseline` replaces the entries of the tests that run, and keeps those of the others. Delete the file first to start over.
+- `--update-larch-baseline` works with `--parallel`. With `--parallel`, the lines printed after the tests are missing, because each worker keeps its own count.
+
+Move the file with `larch()->baseline('tests/Arch/baseline.json')`.
+
 ## Develop
 
 ```bash

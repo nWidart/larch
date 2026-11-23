@@ -10,7 +10,7 @@ use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\PublicApi;
 
 /**
- * The module rules. Each returns the message of the failure, or null.
+ * The module rules. Each returns what it found as a Result.
  *
  * Only links between two modules are checked. Links to vendor classes and
  * to code outside every module are not.
@@ -24,7 +24,7 @@ final readonly class Rules
      *
      * @param  list<Module|PublicApi>  $targets
      */
-    public function onlyDependOn(Module $subject, array $targets): ?string
+    public function onlyDependOn(Module $subject, array $targets): Result
     {
         $this->larch->namespaceOf($subject->name);
 
@@ -60,7 +60,7 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return null;
+            return Result::passed();
         }
 
         $allowed = array_merge(
@@ -69,7 +69,7 @@ final readonly class Rules
         );
         $allowedText = $allowed === [] ? 'no other module' : implode(', ', $allowed);
 
-        return Report::violations("Module {$subject->name} may only depend on {$allowedText}.", $violations);
+        return new Result($violations, fn (array $new): string => Report::violations("Module {$subject->name} may only depend on {$allowedText}.", $new));
     }
 
     /**
@@ -77,7 +77,7 @@ final readonly class Rules
      *
      * @param  list<string>  $modules
      */
-    public function onlyUsePublicApis(array $modules): ?string
+    public function onlyUsePublicApis(array $modules): Result
     {
         $violations = [];
 
@@ -88,12 +88,12 @@ final readonly class Rules
         }
 
         if ($violations === []) {
-            return null;
+            return Result::passed();
         }
 
         $who = count($modules) === 1 ? "Module {$modules[0]} uses" : 'Modules use';
 
-        return Report::violations("{$who} other modules only through their public API.", $violations);
+        return new Result($violations, fn (array $new): string => Report::violations("{$who} other modules only through their public API.", $new));
     }
 
     /**
@@ -101,7 +101,7 @@ final readonly class Rules
      *
      * @param  list<string>  $modules  report only cycles that hold one of these
      */
-    public function noCycles(array $modules): ?string
+    public function noCycles(array $modules): Result
     {
         $links = $this->larch->links();
         $adjacency = [];
@@ -119,7 +119,41 @@ final readonly class Rules
             fn (array $component): bool => count($component) > 1 && array_intersect($component, $modules) !== [],
         ));
 
-        return $cycles === [] ? null : Report::cycles($cycles, $links);
+        $violations = [];
+
+        foreach ($links as $link) {
+            if (self::cycleOf($cycles, $link) !== null) {
+                $violations[] = new Violation($link, "{$link->fromModule} and {$link->toModule} are in a cycle.");
+            }
+        }
+
+        if ($violations === []) {
+            return Result::passed();
+        }
+
+        // A cycle is reported when one of its links is new, with all its links.
+        return new Result($violations, fn (array $new): string => Report::cycles(
+            array_values(array_filter(
+                $cycles,
+                fn (array $cycle): bool => array_filter($new, fn (Violation $violation): bool => self::cycleOf([$cycle], $violation->link) !== null) !== [],
+            )),
+            $links,
+        ));
+    }
+
+    /**
+     * @param  list<list<string>>  $cycles
+     * @return list<string>|null the cycle that holds both ends of the link
+     */
+    private static function cycleOf(array $cycles, ModuleLink $link): ?array
+    {
+        foreach ($cycles as $cycle) {
+            if (in_array($link->fromModule, $cycle, true) && in_array($link->toModule, $cycle, true)) {
+                return $cycle;
+            }
+        }
+
+        return null;
     }
 
     /**

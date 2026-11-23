@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Nwidart\Larch;
 
+use Nwidart\Larch\Baseline\Baseline;
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Rules\Result;
 use Nwidart\Larch\Rules\Rules;
 use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\Modules;
 use Nwidart\Larch\Subjects\PublicApi;
+use Pest\Contracts\HasPrintableTestCaseName;
+use Pest\TestSuite;
 use PHPUnit\Framework\ExpectationFailedException;
 
 /**
@@ -65,13 +69,43 @@ final class Expectations
         throw self::wrongSubject($expectation, 'module(\'Name\') or modules()', $subject);
     }
 
-    private static function assert(?string $failure): void
+    /**
+     * Fail on the violations the baseline does not accept.
+     */
+    private static function assert(Result $result): void
     {
-        if ($failure !== null) {
-            throw new ExpectationFailedException($failure);
+        $larch = Larch::instance();
+        $new = Baseline::check($larch->baselinePath(), self::testName(), $result->violations);
+
+        if ($new === []) {
+            expect(true)->toBeTrue();
+
+            return;
         }
 
-        expect(true)->toBeTrue();
+        $message = $result->report($new);
+        $accepted = count($result->violations) - count($new);
+
+        if ($accepted > 0) {
+            $message .= "\n\n".$accepted.' more '.($accepted === 1 ? 'violation is' : 'violations are').' in the baseline, '.basename($larch->baselinePath()).'.';
+        }
+
+        throw new ExpectationFailedException($message);
+    }
+
+    /**
+     * The test that runs the expectation, as the baseline names it:
+     * "Tests\Arch\ModulesTest > billing only uses public APIs".
+     */
+    private static function testName(): ?string
+    {
+        $test = TestSuite::getInstance()->test;
+
+        if (! $test instanceof HasPrintableTestCaseName) {
+            return null;
+        }
+
+        return $test::getPrintableTestCaseName().' > '.$test->getPrintableTestCaseMethodName();
     }
 
     private static function wrongSubject(string $expectation, string $expected, mixed $subject): LarchException
