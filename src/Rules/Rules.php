@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nwidart\Larch\Rules;
 
+use Nwidart\Larch\Graph\EdgeKind;
 use Nwidart\Larch\Larch;
 use Nwidart\Larch\Modules\ModuleLink;
 use Nwidart\Larch\Subjects\Module;
@@ -17,7 +18,13 @@ use Nwidart\Larch\Subjects\PublicApi;
  */
 final readonly class Rules
 {
-    public function __construct(private Larch $larch) {}
+    /**
+     * @param  list<EdgeKind>  $kinds  the kinds of link the rules check
+     */
+    public function __construct(
+        private Larch $larch,
+        private array $kinds = [EdgeKind::Import],
+    ) {}
 
     /**
      * The module uses only the given modules, or their public API.
@@ -103,7 +110,7 @@ final readonly class Rules
      */
     public function noCycles(array $modules): Result
     {
-        $links = $this->larch->links();
+        $links = $this->larch->links($this->kinds);
         $adjacency = [];
 
         foreach (array_keys($this->larch->moduleMap()) as $module) {
@@ -142,6 +149,38 @@ final readonly class Rules
     }
 
     /**
+     * No class of the module listens to an event of the target modules.
+     *
+     * @param  list<Module>  $targets
+     */
+    public function ignoreEventsOf(Module $subject, array $targets): Result
+    {
+        $this->larch->namespaceOf($subject->name);
+        $names = [];
+
+        foreach ($targets as $target) {
+            $this->larch->namespaceOf($target->name);
+            $names[] = $target->name;
+        }
+
+        $violations = [];
+
+        foreach ($this->linksFrom([$subject->name]) as $link) {
+            if ($link->kind === EdgeKind::Event && in_array($link->toModule, $names, true)) {
+                $violations[] = new Violation($link, "{$subject->name} may not listen to events of {$link->toModule}.");
+            }
+        }
+
+        if ($violations === []) {
+            return Result::passed();
+        }
+
+        $list = implode(', ', $names);
+
+        return new Result($violations, fn (array $new): string => Report::violations("Module {$subject->name} ignores the events of {$list}.", $new));
+    }
+
+    /**
      * @param  list<list<string>>  $cycles
      * @return list<string>|null the cycle that holds both ends of the link
      */
@@ -163,7 +202,7 @@ final readonly class Rules
     private function linksFrom(array $modules): array
     {
         return array_values(array_filter(
-            $this->larch->links(),
+            $this->larch->links($this->kinds),
             fn (ModuleLink $link): bool => in_array($link->fromModule, $modules, true),
         ));
     }

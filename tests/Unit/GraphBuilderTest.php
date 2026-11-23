@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Graph\CallSite;
 use Nwidart\Larch\Graph\Edge;
 use Nwidart\Larch\Graph\EdgeKind;
 use Nwidart\Larch\Graph\GraphBuilder;
@@ -47,6 +48,7 @@ it('records each declared class with its file, and each link with its line', fun
     $graph = (new GraphBuilder(__DIR__.'/../Fixtures', []))->build([__DIR__.'/../Fixtures/references']);
 
     expect($graph->classes)->toBe([
+        'Fixtures\References\Calls' => 'references/Calls.php',
         'Fixtures\References\References' => 'references/References.php',
         'Fixtures\References\Second' => 'references/References.php',
     ]);
@@ -85,3 +87,28 @@ it('stops with the file and the parser error when a file cannot be parsed', func
 it('stops when a folder does not exist', function () {
     (new GraphBuilder('/tmp', []))->build(['/tmp/larch-does-not-exist']);
 })->throws(LarchException::class, 'Larch could not find the folder larch-does-not-exist.');
+
+it('collects the calls the runtime pass resolves, and where keys are bound', function () {
+    $graph = (new GraphBuilder(__DIR__.'/../Fixtures', []))->build([__DIR__.'/../Fixtures/references/Calls.php']);
+
+    $calls = array_map(
+        fn (CallSite $call): string => "{$call->line} {$call->type} ".($call->target ?? 'null').' '.$call->expression,
+        array_values(array_filter($graph->calls, fn (CallSite $call): bool => $call->type !== CallSite::STATIC || $call->target === 'Fixtures\Other\Job')),
+    );
+
+    expect($calls)->toBe([
+        "13 container one app('one')",
+        "14 container two resolve('two')",
+        "15 container three app()->make('three')",
+        "16 container four \$this->app->makeWith('four', [])",
+        "17 container five \$app->make('five')",
+        "18 container six App::make('six')",
+        '19 container Fixtures\Other\Job app(Job::class)',
+        '20 container null app($job)',
+        '21 dispatch Fixtures\Other\Job dispatch(new Job)',
+        '22 dispatch null dispatch_sync($job)',
+        '23 dispatch Fixtures\Other\Job Bus::dispatch(new Job)',
+        '24 static-dispatch Fixtures\Other\Job Job::dispatch()',
+        '24 static Fixtures\Other\Job Job::dispatch()',
+    ])->and($graph->bindings)->toBe(['bound' => 'references/Calls.php:25']);
+});

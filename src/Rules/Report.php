@@ -26,7 +26,14 @@ final class Report
 
         foreach ($violations as $violation) {
             $lines[] = '  '.self::place($violation->link);
-            $lines[] = '    '.$violation->link->fromClass.' uses '.$violation->link->toClass;
+            $lines[] = '    '.self::sentence($violation->link);
+
+            $how = self::how($violation->link);
+
+            if ($how !== null) {
+                $lines[] = '    '.$how;
+            }
+
             $lines[] = '    '.$violation->reason;
             $lines[] = '';
         }
@@ -61,7 +68,7 @@ final class Report
                     $lines[] = '    '.$from.' uses '.$to.' in '.$places.' '.($places === 1 ? 'place' : 'places').':';
 
                     foreach (array_slice($hop, 0, self::LINKS_PER_HOP) as $link) {
-                        $lines[] = '      '.self::place($link).'  '.$link->fromClass.' uses '.$link->toClass;
+                        $lines[] = '      '.self::place($link).'  '.self::sentence($link);
                     }
 
                     if ($places > self::LINKS_PER_HOP) {
@@ -76,6 +83,27 @@ final class Report
         return rtrim(implode("\n", $lines));
     }
 
+    private static function sentence(ModuleLink $link): string
+    {
+        return $link->fromClass.' '.$link->kind->verb().' '.$link->toClass;
+    }
+
+    /**
+     * How a link that is not an import is made: "through the facade
+     * App\Facades\Stock, bound in app/Providers/AppServiceProvider.php:28".
+     */
+    private static function how(ModuleLink $link): ?string
+    {
+        $edge = $link->edges[0];
+
+        return match (true) {
+            $edge->through !== null && $edge->boundIn !== null => "through {$edge->through}, bound in {$edge->boundIn}",
+            $edge->through !== null => "through {$edge->through}",
+            $edge->boundIn !== null => "registered in {$edge->boundIn}",
+            default => null,
+        };
+    }
+
     private static function place(ModuleLink $link): string
     {
         $first = $link->edges[0];
@@ -84,7 +112,7 @@ final class Report
             array_filter($link->edges, fn ($edge): bool => $edge->file === $first->file && $edge->line !== $first->line),
         )));
 
-        $place = $first->file.':'.$first->line;
+        $place = $first->line > 0 ? $first->file.':'.$first->line : $first->file;
 
         if ($others !== []) {
             $place .= ' (also '.(count($others) === 1 ? 'line ' : 'lines ').implode(', ', $others).')';
