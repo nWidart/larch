@@ -65,3 +65,15 @@ it('reads the PSR-4 folders of the project by default', function () {
     expect($graph->has('Nwidart\Larch\Larch'))->toBeTrue()
         ->and($graph->has('PhpParser\Parser'))->toBeFalse();
 });
+
+it('finds the baseline relative to the project root, or at an absolute path', function (string $path, string $expected) {
+    $larch = Larch::reset()->root('/app')->baseline($path);
+
+    expect($larch->baselinePath())->toBe($expected);
+})->with([
+    ['tests/baseline.json', '/app/tests/baseline.json'],
+    ['/tmp/baseline.json', '/tmp/baseline.json'],
+    ['C:/temp/baseline.json', 'C:/temp/baseline.json'],
+    ['C:\temp\baseline.json', 'C:\temp\baseline.json'],
+    ['\\\\server\share\baseline.json', '\\\\server\share\baseline.json'],
+]);

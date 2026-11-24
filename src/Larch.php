@@ -35,6 +35,8 @@ final class Larch
 
     private ?string $root = null;
 
+    private string $baseline = 'larch-baseline.json';
+
     private ?Graph $graph = null;
 
     /** @var array<string, string>|null module name => namespace */
@@ -123,6 +125,25 @@ final class Larch
         return $this->forget();
     }
 
+    /**
+     * The baseline file, relative to the project root or absolute.
+     * By default: larch-baseline.json at the project root.
+     */
+    public function baseline(string $path): self
+    {
+        $this->baseline = $path;
+
+        return $this;
+    }
+
+    public function baselinePath(): string
+    {
+        // /path, C:/path, C:\path and \\server\share are absolute.
+        return preg_match('~^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)~', $this->baseline) === 1
+            ? $this->baseline
+            : $this->projectRoot().'/'.$this->baseline;
+    }
+
     public function graph(): Graph
     {
         return $this->graph ??= (new GraphBuilder($this->projectRoot(), $this->excluded))->build($this->scanPaths());
@@ -187,7 +208,7 @@ final class Larch
 
     /**
      * Every pair of classes in two different modules where the first uses
-     * the second, with the places it does.
+     * the second, one link per kind of edge, with the places it does.
      *
      * @return list<ModuleLink>
      */
@@ -207,7 +228,7 @@ final class Larch
                 continue;
             }
 
-            $key = $edge->from.'|'.$edge->to;
+            $key = $edge->from.'|'.$edge->to."\0".$edge->kind->value;
             $grouped[$key] ??= ['from' => $fromModule, 'to' => $toModule, 'edges' => []];
             $grouped[$key]['edges'][] = $edge;
         }
