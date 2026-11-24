@@ -44,9 +44,11 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     private const array BIND_METHODS = ['bind', 'bindif', 'singleton', 'singletonif', 'scoped', 'scopedif', 'instance'];
 
-    private const string APP_FACADE = 'Illuminate\Support\Facades\App';
+    /** The App facade, and its default alias. */
+    private const array APP_FACADES = ['Illuminate\Support\Facades\App', 'App'];
 
-    private const string BUS_FACADE = 'Illuminate\Support\Facades\Bus';
+    /** The Bus facade, and its default alias. */
+    private const array BUS_FACADES = ['Illuminate\Support\Facades\Bus', 'Bus'];
 
     /** @var list<string> */
     public array $declared = [];
@@ -131,12 +133,16 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     private function collectFunctionCall(FuncCall $call): void
     {
-        if (! $call->name instanceof Node\Name || $this->classStack === []) {
+        if (! $call->name instanceof Node\Name || $call->isFirstClassCallable() || $this->classStack === []) {
             return;
         }
 
-        $name = $call->name->getLast();
-        $lower = strtolower($name);
+        $lower = $this->globalFunction($call->name);
+
+        if ($lower === null) {
+            return;
+        }
+
         $argument = $this->firstArgument($call);
 
         if ($argument === null) {
@@ -152,7 +158,7 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     private function collectStaticCall(StaticCall $call): void
     {
-        if (! $call->class instanceof FullyQualified || ! $call->name instanceof Identifier || $this->classStack === []) {
+        if (! $call->class instanceof FullyQualified || ! $call->name instanceof Identifier || $call->isFirstClassCallable() || $this->classStack === []) {
             return;
         }
 
@@ -160,13 +166,13 @@ final class ReferenceCollector extends NodeVisitorAbstract
         $method = $call->name->toLowerString();
         $argument = $this->firstArgument($call);
 
-        if ($class === self::APP_FACADE && in_array($method, self::CONTAINER_METHODS, true) && $argument !== null) {
+        if (in_array($class, self::APP_FACADES, true) && in_array($method, self::CONTAINER_METHODS, true) && $argument !== null) {
             $this->call(CallSite::CONTAINER, $this->key($argument), $call);
 
             return;
         }
 
-        if ($class === self::BUS_FACADE && in_array($method, self::DISPATCH_METHODS, true) && $argument !== null) {
+        if (in_array($class, self::BUS_FACADES, true) && in_array($method, self::DISPATCH_METHODS, true) && $argument !== null) {
             $this->call(CallSite::DISPATCH, $this->newClass($argument), $call);
 
             return;
@@ -182,7 +188,7 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     private function collectMethodCall(MethodCall $call): void
     {
-        if (! $call->name instanceof Identifier) {
+        if (! $call->name instanceof Identifier || $call->isFirstClassCallable()) {
             return;
         }
 
@@ -209,11 +215,31 @@ final class ReferenceCollector extends NodeVisitorAbstract
     }
 
     /**
+     * The lowercase name of a global function the call reaches, or null when
+     * it reaches a namespaced function: one imported with "use function", or
+     * one declared in the namespace of the file, which PHP tries first.
+     */
+    private function globalFunction(Node\Name $name): ?string
+    {
+        if ($name instanceof FullyQualified) {
+            return $name->isUnqualified() ? $name->toLowerString() : null;
+        }
+
+        $namespaced = $name->getAttribute('namespacedName');
+
+        if ($namespaced instanceof Node\Name && ! $namespaced->isUnqualified() && function_exists($namespaced->toString())) {
+            return null;
+        }
+
+        return $name->isUnqualified() ? $name->toLowerString() : null;
+    }
+
+    /**
      * app(), $this->app, $app and $container.
      */
     private function isContainer(Expr $expression): bool
     {
-        return ($expression instanceof FuncCall && $expression->name instanceof Node\Name && in_array(strtolower($expression->name->getLast()), self::CONTAINER_FUNCTIONS, true))
+        return ($expression instanceof FuncCall && $expression->name instanceof Node\Name && in_array($this->globalFunction($expression->name), self::CONTAINER_FUNCTIONS, true))
             || ($expression instanceof PropertyFetch && $expression->name instanceof Identifier && $expression->name->toString() === 'app')
             || ($expression instanceof Variable && in_array($expression->name, ['app', 'container'], true));
     }

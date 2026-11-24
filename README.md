@@ -87,7 +87,7 @@ arch('inventory does not react to billing events')
 | `Edge::imports()` | A class named in the code. The default. |
 | `Edge::facades()` | A static call on a facade, to the class bound to the facade's key. Real-time facades too. Laravel's own facades are skipped. |
 | `Edge::container()` | `app('key')`, `resolve('key')`, `App::make('key')` or `$this->app->make('key')` with a string key, to the class bound to the key. A key that names a class is already an import. |
-| `Edge::events()` | A listener, to the event it listens to, as the app registers it: `Event::listen()`, event discovery and closures. |
+| `Edge::events()` | A listener, to the event it listens to, as the app registers it: `Event::listen()`, event discovery and closures. A wildcard such as `'App\Billing\Events\*'` links the listener to each scanned class it matches; a pattern with no namespace before its `*` is skipped. |
 | `Edge::jobs()` | `Job::dispatch()`, `dispatch(new Job)` or `Bus::dispatch(new Job)`, to the job. |
 | `Edge::all()` | All of the above. |
 
@@ -95,7 +95,7 @@ arch('inventory does not react to billing events')
 
 How Larch reads the app:
 
-- It reuses the app a Laravel test case booted. Otherwise it boots `bootstrap/app.php` itself, in the `testing` environment. Run the rules in a test that uses the Laravel test case if your providers need more set up.
+- It reuses the app a Laravel test case booted. Otherwise it boots `bootstrap/app.php` itself, in the `testing` environment and without the cached configuration, then restores the environment variables of the process. A test that boots another app gets a graph read from that app. Run the rules in a test that uses the Laravel test case if your providers need more set up.
 - It never builds a service. It reads the class a key is bound to: `bind('pricing', PriceEngine::class)`, or the return type of a binding closure, `singleton('stock', fn (): StockLedger => ...)`. Give binding closures a return type so Larch can follow them.
 - A call it cannot follow, such as `app($class)` or a binding closure with no return type, becomes an unknown link. Unknown links keep their call site. No rule checks them; `larch:graph` will list them.
 - A failure says how a link is made, and where the app binds it:

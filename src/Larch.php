@@ -46,6 +46,9 @@ final class Larch
 
     private ?Graph $runtimeGraph = null;
 
+    /** The app $runtimeGraph was read from. */
+    private ?Container $runtimeApp = null;
+
     /** @var array<string, string>|null module name => namespace */
     private ?array $moduleMap = null;
 
@@ -163,12 +166,21 @@ final class Larch
     /**
      * The graph with the edges of the booted app added: facades, container
      * keys, listeners, jobs and unknown edges. Boots the app if no test has.
+     * Read again when a test boots another app.
      */
     public function runtimeGraph(): Graph
     {
-        return $this->runtimeGraph ??= $this->graph()->withEdges(
-            (new RuntimePass($this->application(), $this->graph(), $this->projectRoot()))->edges(),
-        );
+        $app = $this->application();
+
+        if ($this->runtimeGraph === null || $this->runtimeApp !== $app) {
+            $this->runtimeApp = $app;
+            $this->links = [];
+            $this->runtimeGraph = $this->graph()->withEdges(
+                (new RuntimePass($app, $this->graph(), $this->projectRoot()))->edges(),
+            );
+        }
+
+        return $this->runtimeGraph;
     }
 
     /**
@@ -238,13 +250,13 @@ final class Larch
     public function links(array $kinds = [EdgeKind::Import]): array
     {
         $key = implode(',', array_map(fn (EdgeKind $kind): string => $kind->value, $kinds));
+        $runtime = array_filter($kinds, fn (EdgeKind $kind): bool => $kind !== EdgeKind::Import) !== [];
+        $graph = $runtime ? $this->runtimeGraph() : $this->graph();
 
         if (isset($this->links[$key])) {
             return $this->links[$key];
         }
 
-        $runtime = array_filter($kinds, fn (EdgeKind $kind): bool => $kind !== EdgeKind::Import) !== [];
-        $graph = $runtime ? $this->runtimeGraph() : $this->graph();
         $grouped = [];
 
         foreach ($graph->edgesOf($kinds) as $edge) {
@@ -291,20 +303,53 @@ final class Larch
             throw new LarchException("Larch needs the booted app to read facades, the container, events and jobs. Run the test with the Laravel test case, or add {$bootstrap}.");
         }
 
-        if (getenv('APP_ENV') === false) {
-            putenv('APP_ENV=testing');
-            $_ENV['APP_ENV'] = $_SERVER['APP_ENV'] = 'testing';
+        // Boot in the testing environment, whatever the process says, and
+        // without a cached configuration, which may be the production one.
+        $restore = $this->setEnvironment([
+            'APP_ENV' => 'testing',
+            'APP_CONFIG_CACHE' => sys_get_temp_dir().'/larch-no-config-cache-'.getmypid().'.php',
+        ]);
+
+        try {
+            $app = require $bootstrap;
+
+            if (! $app instanceof Application) {
+                throw new LarchException("{$bootstrap} does not return a Laravel application.");
+            }
+
+            $app->make(Kernel::class)->bootstrap();
+        } finally {
+            $this->setEnvironment($restore);
         }
-
-        $app = require $bootstrap;
-
-        if (! $app instanceof Application) {
-            throw new LarchException("{$bootstrap} does not return a Laravel application.");
-        }
-
-        $app->make(Kernel::class)->bootstrap();
 
         return $app;
+    }
+
+    /**
+     * Set environment variables, and return their previous values (null for
+     * a variable that was not set) to restore them.
+     *
+     * @param  array<string, string|null>  $variables
+     * @return array<string, string|null>
+     */
+    private function setEnvironment(array $variables): array
+    {
+        $previous = [];
+
+        foreach ($variables as $name => $value) {
+            $old = getenv($name);
+            $previous[$name] = $old === false ? null : $old;
+
+            if ($value === null) {
+                putenv($name);
+                unset($_ENV[$name], $_SERVER[$name]);
+            } else {
+                putenv("{$name}={$value}");
+                $_ENV[$name] = $_SERVER[$name] = $value;
+            }
+        }
+
+        return $previous;
     }
 
     /**
@@ -404,6 +449,7 @@ final class Larch
     {
         $this->graph = null;
         $this->runtimeGraph = null;
+        $this->runtimeApp = null;
         $this->moduleMap = null;
         $this->links = [];
 

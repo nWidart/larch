@@ -10,6 +10,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Str;
 use Nwidart\Larch\Graph\CallSite;
 use Nwidart\Larch\Graph\Edge;
 use Nwidart\Larch\Graph\EdgeKind;
@@ -92,11 +93,9 @@ final class RuntimePass
             return $this->unknown($call, "the facade {$class} has no accessor Larch can read");
         }
 
-        if ($this->isClass($accessor)) {
-            return $this->edge($call, EdgeKind::Facade, ltrim($accessor, '\\'), "the facade {$class}");
-        }
-
-        $binding = $this->binding($accessor);
+        // A class accessor is resolved through the container too: an
+        // interface may be bound to another class.
+        $binding = $this->binding(ltrim($accessor, '\\'));
 
         return $binding['class'] === null
             ? $this->unknown($call, "the facade {$class} resolves '{$accessor}', and Larch cannot tell its class without building it. Give the binding closure a return type", $binding['boundIn'])
@@ -160,11 +159,12 @@ final class RuntimePass
 
         $edges = [];
 
-        /** @var array<string, list<mixed>> $raw */
+        /** @var array<array-key, list<mixed>> $raw */
         $raw = $events->getRawListeners();
 
         foreach ($raw as $event => $listeners) {
-            if (! $this->isClass($event)) {
+            // A numeric event name is an integer key.
+            if (! is_string($event) || ! $this->isClass($event)) {
                 continue;
             }
 
@@ -177,7 +177,59 @@ final class RuntimePass
             }
         }
 
+        foreach ($this->wildcards($events) as $pattern => $listeners) {
+            foreach ($this->classesMatching($pattern) as $event) {
+                foreach ($listeners as $listener) {
+                    $edge = $this->listenerEdge($event, $listener);
+
+                    if ($edge !== null) {
+                        $edges[] = $edge;
+                    }
+                }
+            }
+        }
+
         return $edges;
+    }
+
+    /**
+     * Listeners of patterns such as 'App\\Billing\\Events\\*', which
+     * getRawListeners() leaves out.
+     *
+     * @return array<array-key, array<mixed>> pattern => listeners
+     */
+    private function wildcards(Dispatcher $events): array
+    {
+        if (! property_exists($events, 'wildcards')) {
+            return [];
+        }
+
+        $wildcards = (new ReflectionProperty($events, 'wildcards'))->getValue($events);
+
+        return is_array($wildcards) ? array_filter($wildcards, 'is_array') : [];
+    }
+
+    /**
+     * The scanned classes a wildcard event name matches, as Laravel matches
+     * it. A pattern needs a namespace before its first *: a pattern such as
+     * '*' matches every event name, and Larch cannot tell the classes that
+     * are events from the others.
+     *
+     * @return list<string>
+     */
+    private function classesMatching(string|int $pattern): array
+    {
+        $pattern = (string) $pattern;
+        $prefix = strstr($pattern, '*', true);
+
+        if ($prefix === false || ! str_contains($prefix, '\\')) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_keys($this->graph->classes),
+            fn (string $class): bool => Str::is($pattern, $class),
+        ));
     }
 
     private function listenerEdge(string $event, mixed $listener): ?Edge

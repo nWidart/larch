@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Bootstrap\HandleExceptions;
 use Illuminate\Support\Facades\Facade;
 use Nwidart\Larch\Edge;
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Graph\CallSite;
 use Nwidart\Larch\Graph\Edge as GraphEdge;
 use Nwidart\Larch\Graph\EdgeKind;
+use Nwidart\Larch\Graph\Graph;
 use Nwidart\Larch\Larch;
+use Nwidart\Larch\Runtime\RuntimePass;
+use Wired\Billing\Events\InvoiceIssued;
+use Wired\Catalog\Contracts\PricesOrders;
 use Wired\Catalog\Pricing\PriceEngine;
+use Wired\Inventory\Listeners\ReleaseHold;
 use Wired\Shared\Facades\Stock;
 
 use function Nwidart\Larch\module;
@@ -158,6 +165,71 @@ it('reuses the app a test booted', function () {
 
     expect($facade->to)->toBe('Wired\Catalog\Pricing\PriceEngine');
 });
+
+it('reads the graph again when a later test boots another app', function () {
+    $larch = wired();
+    $larch->runtimeGraph();
+
+    $app = require __DIR__.'/../Fixtures/wired/bootstrap/app.php';
+    $app->make(Kernel::class)->bootstrap();
+    $app['events']->listen(InvoiceIssued::class, PriceEngine::class);
+
+    $listeners = fn (): array => array_values(array_map(
+        fn (GraphEdge $edge): string => $edge->from,
+        array_filter($larch->runtimeGraph()->edges, fn (GraphEdge $edge): bool => $edge->to === InvoiceIssued::class),
+    ));
+
+    expect($listeners())->toContain(PriceEngine::class);
+});
+
+it('boots its own app in the testing environment, and restores the process environment', function () {
+    putenv('APP_ENV=production');
+
+    try {
+        wired()->runtimeGraph();
+
+        expect(Container::getInstance()->make('env'))->toBe('testing')
+            ->and(getenv('APP_ENV'))->toBe('production')
+            ->and(getenv('APP_CONFIG_CACHE'))->toBeFalse();
+    } finally {
+        putenv('APP_ENV');
+        unset($_ENV['APP_ENV'], $_SERVER['APP_ENV']);
+    }
+});
+
+it('follows a facade accessor that names a class through the container, and wildcard listeners', function () {
+    $app = new Container;
+    $app->bind(PricesOrders::class, PriceEngine::class);
+    $events = new Dispatcher($app);
+    $events->listen('Wired\Billing\Events\*', ReleaseHold::class);
+    $events->listen('*', ReleaseHold::class);
+    $events->listen('404', ReleaseHold::class);
+    $app->instance('events', $events);
+
+    $graph = new Graph(
+        ['Wired\Billing\Events\InvoiceIssued' => 'InvoiceIssued.php', 'Wired\Inventory\Listeners\ReleaseHold' => 'ReleaseHold.php'],
+        [],
+        [new CallSite(CallSite::STATIC, 'Wired\Inventory\Listeners\ReleaseHold', PricesFacade::class, 'Prices::quote()', 'ReleaseHold.php', 9)],
+    );
+
+    $edges = array_map(
+        fn (GraphEdge $edge): string => "{$edge->from} {$edge->kind->value} {$edge->to}",
+        (new RuntimePass($app, $graph, '/'))->edges(),
+    );
+
+    expect($edges)->toBe([
+        'Wired\Inventory\Listeners\ReleaseHold facade Wired\Catalog\Pricing\PriceEngine',
+        'Wired\Inventory\Listeners\ReleaseHold event Wired\Billing\Events\InvoiceIssued',
+    ]);
+});
+
+final class PricesFacade extends Facade
+{
+    protected static function getFacadeAccessor(): string
+    {
+        return PricesOrders::class;
+    }
+}
 
 it('asks for the app when it cannot boot one', function () {
     shop();

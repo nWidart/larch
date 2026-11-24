@@ -24,5 +24,11 @@ final class Calls
         Job::dispatch();
         $this->app->singleton('bound', fn () => null);
         $other->make('not-the-container');
+        \App::make('seven');
+        \Bus::dispatch(new Job);
+        $first = strlen(...);
+        $second = $this->handle(...);
+        $third = Job::dispatch(...);
+        \Fixtures\Templates\resolve('not-a-binding');
     }
 }

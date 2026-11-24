@@ -110,5 +110,7 @@ it('collects the calls the runtime pass resolves, and where keys are bound', fun
         '23 dispatch Fixtures\Other\Job Bus::dispatch(new Job)',
         '24 static-dispatch Fixtures\Other\Job Job::dispatch()',
         '24 static Fixtures\Other\Job Job::dispatch()',
+        "27 container seven \\App::make('seven')",
+        '28 dispatch Fixtures\Other\Job \Bus::dispatch(new Job)',
     ])->and($graph->bindings)->toBe(['bound' => 'references/Calls.php:25']);
 });
