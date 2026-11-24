@@ -21,3 +21,12 @@ arch('no cycles')
 arch('catalog depends only on shared')
     ->expect(module('Catalog'))
     ->toOnlyDependOn(module('Shared'));
+
+// With LARCH_STOP, a test that fails between two checks.
+if (getenv('LARCH_STOP') === '1') {
+    test('billing, then cycles', function () {
+        expect(module('Billing'))->toOnlyDependOn(module('Shared'));
+        expect('stopped')->toBe('running');
+        expect(modules())->toHaveNoCycles();
+    });
+}

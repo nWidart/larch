@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Nwidart\Larch\Baseline;
 
 use Nwidart\Larch\Rules\Violation;
+use Pest\Contracts\HasPrintableTestCaseName;
+use Pest\Exceptions\InvalidPestCommand;
+use Pest\TestSuite;
+use PHPUnit\Framework\TestCase;
 
 /**
  * The baseline during one Pest run: which violations each test accepts,
@@ -18,67 +22,64 @@ final class Baseline
 {
     private static bool $updating = false;
 
+    private static bool $committed = false;
+
     /** @var array<string, array<string, array<string, Fingerprint>>> file => test => key => fingerprint */
     private static array $files = [];
 
     /** @var array<string, array<string, array<string, Fingerprint>>> file => test => key => fingerprint */
     private static array $seen = [];
 
-    /** @var array<string, array<string, true>> file => tests with a new violation */
-    private static array $failed = [];
+    /** @var array<string, array<string, TestCase>> file => test name => test */
+    private static array $tests = [];
 
     /** @var array<string, int> file => violations found in the baseline */
     private static array $matched = [];
 
-    public static function update(bool $updating = true): void
-    {
-        self::$updating = $updating;
-    }
-
-    public static function isUpdating(): bool
-    {
-        return self::$updating;
-    }
-
     /**
-     * Forget the state of the run. For Larch's own tests.
-     *
-     * @internal
+     * Write the baseline from this run. It is written when Pest prints its
+     * summary, or, in a parallel worker that prints none, when PHP exits.
      */
-    public static function reset(): void
+    public static function update(): void
     {
-        self::$updating = false;
-        self::$files = self::$seen = self::$failed = self::$matched = [];
+        if (! self::$updating) {
+            self::$updating = true;
+            register_shutdown_function(self::commit(...));
+        }
     }
 
     /**
-     * Record the violations a rule found in a test, and return those the
-     * baseline does not accept. While updating, write them and return none.
+     * Record the violations a rule found in the running test, and return
+     * those the baseline does not accept. While updating, return none: the
+     * baseline is written once the tests are done.
      *
-     * @param  string|null  $test  null outside a Pest test: nothing is accepted or recorded
+     * Outside a Pest test, nothing is accepted or recorded.
+     *
      * @param  list<Violation>  $violations
      * @return list<Violation>
      */
-    public static function check(string $file, ?string $test, array $violations): array
+    public static function check(string $file, array $violations): array
     {
+        $test = self::currentTest();
+
         if ($test === null) {
             return $violations;
         }
 
-        self::$seen[$file][$test] ??= [];
+        $name = $test::getPrintableTestCaseName().' > '.$test->getPrintableTestCaseMethodName();
+        self::$tests[$file][$name] = $test;
+        self::$seen[$file][$name] ??= [];
 
         foreach ($violations as $violation) {
             $fingerprint = $violation->link->fingerprint();
-            self::$seen[$file][$test][$fingerprint->key()] = $fingerprint;
+            self::$seen[$file][$name][$fingerprint->key()] = $fingerprint;
         }
 
         if (self::$updating) {
-            BaselineFile::replace($file, $test, array_values(self::$seen[$file][$test]));
-
             return [];
         }
 
-        $accepted = self::entries($file)[$test] ?? [];
+        $accepted = self::entries($file)[$name] ?? [];
         $new = array_values(array_filter(
             $violations,
             fn (Violation $violation): bool => ! isset($accepted[$violation->link->fingerprint()->key()]),
@@ -86,11 +87,33 @@ final class Baseline
 
         self::$matched[$file] = (self::$matched[$file] ?? 0) + count($violations) - count($new);
 
-        if ($new !== []) {
-            self::$failed[$file][$test] = true;
+        return $new;
+    }
+
+    /**
+     * Write what the tests found to the baseline, once. A test that did not
+     * pass keeps the entries it had, as it may have stopped before a check.
+     */
+    private static function commit(): void
+    {
+        if (! self::$updating || self::$committed) {
+            return;
         }
 
-        return $new;
+        self::$committed = true;
+
+        foreach (self::$seen as $file => $tests) {
+            $updates = [];
+
+            foreach ($tests as $name => $fingerprints) {
+                $updates[$name] = [
+                    'fingerprints' => array_values($fingerprints),
+                    'complete' => self::passed(self::$tests[$file][$name]),
+                ];
+            }
+
+            BaselineFile::write($file, $updates);
+        }
     }
 
     /**
@@ -101,6 +124,8 @@ final class Baseline
      */
     public static function summary(): array
     {
+        self::commit();
+
         $lines = [];
 
         foreach (self::$seen as $file => $tests) {
@@ -122,13 +147,14 @@ final class Baseline
 
             $gone = [];
 
-            foreach ($tests as $test => $seen) {
-                if (isset(self::$failed[$file][$test])) {
+            foreach ($tests as $name => $seen) {
+                // A test that did not pass may have stopped before a check.
+                if (! self::passed(self::$tests[$file][$name])) {
                     continue;
                 }
 
-                foreach (array_diff_key(self::entries($file)[$test] ?? [], $seen) as $fingerprint) {
-                    $gone[] = '  '.$test.': '.$fingerprint->key();
+                foreach (array_diff_key(self::entries($file)[$name] ?? [], $seen) as $fingerprint) {
+                    $gone[] = '  '.$name.': '.$fingerprint->key();
                 }
             }
 
@@ -140,6 +166,28 @@ final class Baseline
         }
 
         return $lines;
+    }
+
+    /**
+     * The running Pest test. Null outside one, or when PHPUnit runs the
+     * tests without Pest.
+     *
+     * @return (TestCase&HasPrintableTestCaseName)|null
+     */
+    private static function currentTest(): ?TestCase
+    {
+        try {
+            $test = TestSuite::getInstance()->test;
+        } catch (InvalidPestCommand) {
+            return null;
+        }
+
+        return $test instanceof HasPrintableTestCaseName ? $test : null;
+    }
+
+    private static function passed(TestCase $test): bool
+    {
+        return $test->status()->isSuccess();
     }
 
     /**

@@ -16,9 +16,11 @@ afterEach(function () {
 });
 
 /**
+ * @param  list<string>  $options
+ * @param  array<string, string>  $env
  * @return array{exit: int, output: string}
  */
-function pestOnFixture(string $baseline, string ...$options): array
+function pestOnFixture(string $baseline, array $options = [], array $env = []): array
 {
     $command = array_merge(
         [PHP_BINARY, 'vendor/bin/pest', 'tests/Fixtures/baseline/ModulesTest.php', '--colors=never'],
@@ -28,6 +30,7 @@ function pestOnFixture(string $baseline, string ...$options): array
     $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__, 2), [
         'LARCH_BASELINE' => $baseline,
         'PATH' => (string) getenv('PATH'),
+        ...$env,
     ]);
 
     $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
@@ -52,7 +55,7 @@ function writeBaseline(string $path, array $fingerprints): void
 }
 
 it('writes the violations of each test with --update-larch-baseline, and passes', function () {
-    $run = pestOnFixture($this->baseline, '--update-larch-baseline');
+    $run = pestOnFixture($this->baseline, ['--update-larch-baseline']);
 
     expect($run['exit'])->toBe(0)
         ->and($run['output'])->toContain('Larch: wrote 4 violations of 2 tests to the baseline')
@@ -91,7 +94,7 @@ it('writes the violations of each test with --update-larch-baseline, and passes'
 });
 
 it('passes when every violation is in the baseline, and says how many are', function () {
-    pestOnFixture($this->baseline, '--update-larch-baseline');
+    pestOnFixture($this->baseline, ['--update-larch-baseline']);
 
     $run = pestOnFixture($this->baseline);
 
@@ -125,7 +128,7 @@ it('reports a cycle with all its links when one link is new', function () {
         ['no cycles', 'Modules\Checkout\Actions\PlaceOrder', 'Modules\Shipping\Contracts\Ships'],
     ]);
 
-    $run = pestOnFixture($this->baseline, '--filter=no cycles');
+    $run = pestOnFixture($this->baseline, ['--filter=no cycles']);
 
     expect($run['exit'])->toBe(1)
         ->and($run['output'])->toContain('Checkout uses Shipping in 1 place:')
@@ -134,7 +137,7 @@ it('reports a cycle with all its links when one link is new', function () {
 });
 
 it('lists the entries that no violation matches', function () {
-    pestOnFixture($this->baseline, '--update-larch-baseline');
+    pestOnFixture($this->baseline, ['--update-larch-baseline']);
 
     $data = json_decode((string) file_get_contents($this->baseline), true);
     $data['tests']['Tests\Fixtures\baseline\ModulesTest > catalog depends only on shared'] = [
@@ -155,13 +158,13 @@ it('lists the entries that no violation matches', function () {
 });
 
 it('keeps the entries of tests that did not run when it updates', function () {
-    pestOnFixture($this->baseline, '--update-larch-baseline');
+    pestOnFixture($this->baseline, ['--update-larch-baseline']);
     writeBaseline($this->baseline, [
         ['billing depends only on shared', 'Modules\Billing\Actions\ChargeOrder', 'Modules\Catalog\Contracts\PricesOrders'],
         ['catalog depends only on shared', 'Modules\Catalog\Models\Product', 'Modules\Billing\Models\Invoice'],
     ]);
 
-    pestOnFixture($this->baseline, '--update-larch-baseline', '--filter=billing');
+    pestOnFixture($this->baseline, ['--update-larch-baseline', '--filter=billing']);
 
     $tests = json_decode((string) file_get_contents($this->baseline), true)['tests'];
 
@@ -171,15 +174,34 @@ it('keeps the entries of tests that did not run when it updates', function () {
     ])->and($tests['Tests\Fixtures\baseline\ModulesTest > billing depends only on shared'])->toHaveCount(2);
 });
 
+it('keeps the entries of a test that stopped before its last check', function () {
+    $stopped = ['LARCH_STOP' => '1'];
+    writeBaseline($this->baseline, [
+        ['billing, then cycles', 'Modules\Checkout\Actions\PlaceOrder', 'Modules\Shipping\Contracts\Ships'],
+    ]);
+
+    $run = pestOnFixture($this->baseline, ['--filter=then'], $stopped);
+    $update = pestOnFixture($this->baseline, ['--filter=then', '--update-larch-baseline'], $stopped);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['output'])->not->toContain('no longer matches')
+        ->and($update['exit'])->toBe(1)
+        ->and(array_column(json_decode((string) file_get_contents($this->baseline), true)['tests']['Tests\Fixtures\baseline\ModulesTest > billing, then cycles'], 'to'))->toBe([
+            'Modules\Catalog\Contracts\PricesOrders',
+            'Modules\Catalog\Pricing\PriceEngine',
+            'Modules\Shipping\Contracts\Ships',
+        ]);
+});
+
 it('updates the baseline from parallel workers', function () {
-    $run = pestOnFixture($this->baseline, '--parallel', '--processes=2', '--update-larch-baseline');
+    $run = pestOnFixture($this->baseline, ['--parallel', '--processes=2', '--update-larch-baseline']);
 
     expect($run['exit'])->toBe(0)
         ->and(array_keys(json_decode((string) file_get_contents($this->baseline), true)['tests']))->toBe([
             'Tests\Fixtures\baseline\ModulesTest > billing depends only on shared',
             'Tests\Fixtures\baseline\ModulesTest > no cycles',
         ])
-        ->and(pestOnFixture($this->baseline, '--parallel', '--processes=2')['exit'])->toBe(0);
+        ->and(pestOnFixture($this->baseline, ['--parallel', '--processes=2'])['exit'])->toBe(0);
 });
 
 it('stops on a baseline of another version', function () {

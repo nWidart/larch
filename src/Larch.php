@@ -138,7 +138,10 @@ final class Larch
 
     public function baselinePath(): string
     {
-        return str_starts_with($this->baseline, '/') ? $this->baseline : $this->projectRoot().'/'.$this->baseline;
+        // /path, C:/path, C:\path and \\server\share are absolute.
+        return preg_match('~^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)~', $this->baseline) === 1
+            ? $this->baseline
+            : $this->projectRoot().'/'.$this->baseline;
     }
 
     public function graph(): Graph
@@ -225,7 +228,7 @@ final class Larch
                 continue;
             }
 
-            $key = $edge->from.'|'.$edge->to.'|'.$edge->kind->value;
+            $key = $edge->from.'|'.$edge->to."\0".$edge->kind->value;
             $grouped[$key] ??= ['from' => $fromModule, 'to' => $toModule, 'edges' => []];
             $grouped[$key]['edges'][] = $edge;
         }

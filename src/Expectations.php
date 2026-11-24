@@ -11,8 +11,6 @@ use Nwidart\Larch\Rules\Rules;
 use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\Modules;
 use Nwidart\Larch\Subjects\PublicApi;
-use Pest\Contracts\HasPrintableTestCaseName;
-use Pest\TestSuite;
 use PHPUnit\Framework\ExpectationFailedException;
 
 /**
@@ -75,7 +73,7 @@ final class Expectations
     private static function assert(Result $result): void
     {
         $larch = Larch::instance();
-        $new = Baseline::check($larch->baselinePath(), self::testName(), $result->violations);
+        $new = Baseline::check($larch->baselinePath(), $result->violations);
 
         if ($new === []) {
             expect(true)->toBeTrue();
@@ -91,21 +89,6 @@ final class Expectations
         }
 
         throw new ExpectationFailedException($message);
-    }
-
-    /**
-     * The test that runs the expectation, as the baseline names it:
-     * "Tests\Arch\ModulesTest > billing only uses public APIs".
-     */
-    private static function testName(): ?string
-    {
-        $test = TestSuite::getInstance()->test;
-
-        if (! $test instanceof HasPrintableTestCaseName) {
-            return null;
-        }
-
-        return $test::getPrintableTestCaseName().' > '.$test->getPrintableTestCaseMethodName();
     }
 
     private static function wrongSubject(string $expectation, string $expected, mixed $subject): LarchException

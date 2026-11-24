@@ -100,8 +100,9 @@ This writes `larch-baseline.json` at the project root. Commit it. Each entry is 
 With a baseline:
 
 - A test fails only on violations that are not in it. The failure message says how many more are in the baseline.
-- After the tests, Pest prints how many violations the baseline accepted, and lists the entries that no violation matches any more. The next `--update-larch-baseline` removes them.
-- `--update-larch-baseline` replaces the entries of the tests that run, and keeps those of the others. Delete the file first to start over.
+- After the tests, Pest prints how many violations the baseline accepted, and lists the entries of passing tests that no violation matches any more. The next `--update-larch-baseline` removes them.
+- `--update-larch-baseline` replaces the entries of the tests that pass, and keeps those of the others. A test that fails may stop before a check, so it keeps its entries and gains the new ones. Delete the file first to start over.
+- The baseline is written once the tests are done, through a temporary file, so a failed write leaves it as it was.
 - `--update-larch-baseline` works with `--parallel`. With `--parallel`, the lines printed after the tests are missing, because each worker keeps its own count.
 
 Move the file with `larch()->baseline('tests/Arch/baseline.json')`.

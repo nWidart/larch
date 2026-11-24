@@ -43,43 +43,61 @@ final class BaselineFile
     }
 
     /**
-     * Replace the entries of one test, and keep those of every other test.
-     * The file is locked while it is read and written, so parallel workers
-     * can each write their own tests.
+     * Write the entries of the tests that ran, and keep those of every other
+     * test. A test that completed gets exactly its fingerprints. A test that
+     * stopped early may not have run all its checks, so its fingerprints are
+     * added to the entries it had.
      *
-     * @param  list<Fingerprint>  $fingerprints
+     * Parallel workers each write their own tests: a lock file in the temp
+     * directory, named after the baseline, holds the read and the write
+     * together. It stays there, so every worker locks the same file. The new contents go
+     * to a temporary file, renamed over the baseline once fully written, so
+     * a failed write leaves the baseline as it was.
+     *
+     * @param  array<string, array{fingerprints: list<Fingerprint>, complete: bool}>  $updates  test => update
      */
-    public static function replace(string $path, string $test, array $fingerprints): void
+    public static function write(string $path, array $updates): void
     {
-        $handle = fopen($path, 'c+');
+        $lock = fopen(sys_get_temp_dir().'/larch-baseline-'.md5($path).'.lock', 'c');
 
-        if ($handle === false) {
+        if ($lock === false) {
             throw new LarchException("Larch could not write the baseline {$path}.");
         }
 
         try {
-            flock($handle, LOCK_EX);
+            flock($lock, LOCK_EX);
 
-            $contents = stream_get_contents($handle);
-            $tests = $contents === false || trim($contents) === '' ? [] : self::decode($path, $contents);
+            $tests = self::read($path);
 
-            $tests[$test] = [];
+            foreach ($updates as $test => $update) {
+                $entries = $update['complete'] ? [] : ($tests[$test] ?? []);
 
-            foreach ($fingerprints as $fingerprint) {
-                $tests[$test][$fingerprint->key()] = $fingerprint;
+                foreach ($update['fingerprints'] as $fingerprint) {
+                    $entries[$fingerprint->key()] = $fingerprint;
+                }
+
+                if ($entries === []) {
+                    unset($tests[$test]);
+                } else {
+                    $tests[$test] = $entries;
+                }
             }
 
-            if ($tests[$test] === []) {
-                unset($tests[$test]);
-            }
-
-            ftruncate($handle, 0);
-            rewind($handle);
-            fwrite($handle, self::encode($tests));
-            fflush($handle);
+            self::replaceFile($path, self::encode($tests));
         } finally {
-            flock($handle, LOCK_UN);
-            fclose($handle);
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    private static function replaceFile(string $path, string $contents): void
+    {
+        $temporary = $path.'.'.getmypid().'.tmp';
+
+        if (file_put_contents($temporary, $contents) !== strlen($contents) || ! rename($temporary, $path)) {
+            @unlink($temporary);
+
+            throw new LarchException("Larch could not write the baseline {$path}.");
         }
     }
 

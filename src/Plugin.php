@@ -7,6 +7,7 @@ namespace Nwidart\Larch;
 use Nwidart\Larch\Baseline\Baseline;
 use Pest\Contracts\Plugins\AddsOutput;
 use Pest\Contracts\Plugins\HandlesArguments;
+use Pest\Plugins\Parallel;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -30,12 +31,15 @@ final readonly class Plugin implements AddsOutput, HandlesArguments
      * read here, when Pest loads its plugins, and passed to the workers
      * through the environment they inherit. Symfony Process, which starts
      * them, copies the variables of $_ENV.
+     *
+     * Only a parallel run sets the variable, and only a worker reads it, so
+     * a Pest process that a test starts does not update its baseline.
      */
     public function __construct(private OutputInterface $output)
     {
         $argv = $_SERVER['argv'] ?? [];
 
-        if (is_array($argv) && in_array(self::UPDATE_OPTION, $argv, true)) {
+        if (is_array($argv) && in_array(self::UPDATE_OPTION, $argv, true) && Parallel::isEnabled()) {
             putenv(self::UPDATE_VARIABLE.'=1');
             $_ENV[self::UPDATE_VARIABLE] = '1';
         }
@@ -46,7 +50,7 @@ final readonly class Plugin implements AddsOutput, HandlesArguments
      */
     public function handleArguments(array $arguments): array
     {
-        if (in_array(self::UPDATE_OPTION, $arguments, true) || getenv(self::UPDATE_VARIABLE) === '1') {
+        if (in_array(self::UPDATE_OPTION, $arguments, true) || (Parallel::isWorker() && getenv(self::UPDATE_VARIABLE) === '1')) {
             Baseline::update();
         }
 
