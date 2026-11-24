@@ -3,23 +3,11 @@
 declare(strict_types=1);
 
 use Nwidart\Larch\Exceptions\LarchException;
-use PHPUnit\Framework\ExpectationFailedException;
 
 use function Nwidart\Larch\module;
 use function Nwidart\Larch\modules;
 
 beforeEach(fn () => shop());
-
-function failureOf(Closure $expectation): string
-{
-    try {
-        $expectation();
-    } catch (ExpectationFailedException $failure) {
-        return $failure->getMessage();
-    }
-
-    throw new RuntimeException('The expectation passed.');
-}
 
 describe('toOnlyDependOn', function () {
     it('passes when every link goes to an allowed module', function () {

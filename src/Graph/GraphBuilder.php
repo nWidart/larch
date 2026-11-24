@@ -40,7 +40,10 @@ final class GraphBuilder
     public function build(array $paths): Graph
     {
         $classes = [];
+        $lines = [];
         $edges = [];
+        $calls = [];
+        $bindings = [];
 
         foreach ($this->files($paths) as $file) {
             $relative = $this->relative($file);
@@ -50,14 +53,24 @@ final class GraphBuilder
                 $classes[$class] = $relative;
             }
 
+            $lines += $collector->lines;
+
             foreach ($collector->references as $reference) {
                 $edges[] = new Edge($reference['from'], $reference['to'], EdgeKind::Import, $relative, $reference['line']);
+            }
+
+            foreach ($collector->calls as $call) {
+                $calls[] = new CallSite($call['type'], $call['from'], $call['target'], $call['expression'], $relative, $call['line']);
+            }
+
+            foreach ($collector->bindings as $key => $line) {
+                $bindings[$key] ??= $relative.':'.$line;
             }
         }
 
         ksort($classes);
 
-        return new Graph($classes, $edges);
+        return new Graph($classes, $edges, $calls, $bindings, $lines);
     }
 
     private function parse(string $file, string $relative): ReferenceCollector
@@ -74,9 +87,11 @@ final class GraphBuilder
             throw new LarchException("Larch could not parse {$relative}: {$error->getMessage()}. Fix the file or exclude its folder with larch()->exclude().", previous: $error);
         }
 
-        $collector = new ReferenceCollector;
-        $traverser = new NodeTraverser(new NameResolver, $collector);
-        $traverser->traverse($ast);
+        // Names are resolved in a first pass, so the collector sees the
+        // arguments of a call resolved when it enters the call.
+        $ast = (new NodeTraverser(new NameResolver))->traverse($ast);
+        $collector = new ReferenceCollector($code);
+        (new NodeTraverser($collector))->traverse($ast);
 
         return $collector;
     }

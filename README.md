@@ -2,7 +2,10 @@
 
 Architecture rules for Laravel apps, as a Pest plugin. Larch checks which module uses which, and prints every link that breaks a rule with the file and line it comes from.
 
-Larch is in early development. This release reads the code only: it finds links from class names in code (types, `new`, static calls, `::class`, attributes, `extends`, `implements`). Later releases boot the app to find links made through facades, the container, events and queued jobs.
+Larch is in early development. It finds links in two ways:
+
+- From the code: class names in types, `new`, static calls, `::class`, attributes, `extends` and `implements`.
+- From the booted app, with `via()`: the class behind a facade or a container key, the listeners of each event, and the jobs a class dispatches. Import-based tools such as Pest's `arch()`, Deptrac and PHPat cannot see these.
 
 ## Install
 
@@ -54,12 +57,55 @@ arch('no module is in a cycle')
 | `toOnlyDependOn(...$targets)` | `module('Name')` | The module uses a module that is not a target. A target `module('Name')->publicApi()` allows only that module's public API. |
 | `toOnlyUsePublicApis()` | `module('Name')` or `modules()` | The module uses a class of another module outside its public API. |
 | `toHaveNoCycles()` | `module('Name')` or `modules()` | Modules use each other, directly or through other modules. |
+| `toIgnoreEventsOf(...$modules)` | `module('Name')` | A listener of the module listens to an event of one of the modules. Reads the booted app. |
 
 Only links between two modules are checked. Links to vendor classes and to code outside every module are not.
 
 Rules that forbid something have positive names, such as `toHaveNoCycles()`. Pest's `not->` replaces the failure message, so a rule written with `not->` would lose the list of links.
 
 `module()` and `modules()` are namespaced functions. Import them with `use function`: `nwidart/laravel-modules` already defines a global `module()` helper.
+
+## Links the app makes
+
+By default a rule checks imports only. Add `via()` to check the links the booted app makes too:
+
+```php
+use Nwidart\Larch\Edge;
+
+arch('billing uses only shared, and the public API of catalog')
+    ->expect(module('Billing'))
+    ->toOnlyDependOn(module('Shared'), module('Catalog')->publicApi())
+    ->via(Edge::all());
+
+arch('inventory does not react to billing events')
+    ->expect(module('Inventory'))
+    ->toIgnoreEventsOf(module('Billing'));
+```
+
+| Kind | Link |
+|---|---|
+| `Edge::imports()` | A class named in the code. The default. |
+| `Edge::facades()` | A static call on a facade, to the class bound to the facade's key. Real-time facades too. Laravel's own facades are skipped. |
+| `Edge::container()` | `app('key')`, `resolve('key')`, `App::make('key')` or `$this->app->make('key')` with a string key, to the class bound to the key. A key that names a class is already an import. |
+| `Edge::events()` | A listener, to the event it listens to, as the app registers it: `Event::listen()`, event discovery and closures. A wildcard such as `'App\Billing\Events\*'` links the listener to each scanned class it matches; a pattern with no namespace before its `*` is skipped. |
+| `Edge::jobs()` | `Job::dispatch()`, `dispatch(new Job)` or `Bus::dispatch(new Job)`, to the job. |
+| `Edge::all()` | All of the above. |
+
+`via()` takes several kinds: `via(Edge::imports(), Edge::events())`. It works after `toOnlyDependOn()`, `toOnlyUsePublicApis()` and `toHaveNoCycles()`.
+
+How Larch reads the app:
+
+- It reuses the app a Laravel test case booted. Otherwise it boots `bootstrap/app.php` itself, in the `testing` environment and without the cached configuration, then restores the environment variables of the process. A test that boots another app gets a graph read from that app. Run the rules in a test that uses the Laravel test case if your providers need more set up.
+- It never builds a service. It reads the class a key is bound to: `bind('pricing', PriceEngine::class)`, or the return type of a binding closure, `singleton('stock', fn (): StockLedger => ...)`. Give binding closures a return type so Larch can follow them.
+- A call it cannot follow, such as `app($class)` or a binding closure with no return type, becomes an unknown link. Unknown links keep their call site. No rule checks them; `larch:graph` will list them.
+- A failure says how a link is made, and where the app binds it:
+
+```
+  Modules/Billing/app/Actions/ChargeOrder.php:18
+    Modules\Billing\Actions\ChargeOrder uses Modules\Inventory\Internal\StockLedger
+    through the facade Modules\Shared\Facades\Stock, bound in Modules/Inventory/app/Providers/InventoryServiceProvider.php:13
+    Billing may not depend on Inventory.
+```
 
 ## What a failure looks like
 

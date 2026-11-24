@@ -6,11 +6,13 @@ namespace Nwidart\Larch;
 
 use Nwidart\Larch\Baseline\Baseline;
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Graph\EdgeKind;
 use Nwidart\Larch\Rules\Result;
 use Nwidart\Larch\Rules\Rules;
 use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\Modules;
 use Nwidart\Larch\Subjects\PublicApi;
+use Pest\Expectation;
 use PHPUnit\Framework\ExpectationFailedException;
 
 /**
@@ -21,10 +23,13 @@ use PHPUnit\Framework\ExpectationFailedException;
 final class Expectations
 {
     /**
+     * @param  Expectation<mixed>  $expectation
      * @param  list<mixed>  $targets
      */
-    public static function toOnlyDependOn(mixed $subject, array $targets): void
+    public static function toOnlyDependOn(Expectation $expectation, array $targets): PendingRule
     {
+        $subject = $expectation->value;
+
         if (! $subject instanceof Module) {
             throw self::wrongSubject('toOnlyDependOn', 'module(\'Name\')', $subject);
         }
@@ -36,17 +41,64 @@ final class Expectations
         }
 
         /** @var list<Module|PublicApi> $targets */
-        self::assert((new Rules(Larch::instance()))->onlyDependOn($subject, $targets));
+        return new PendingRule($expectation, fn (array $kinds) => self::assert(
+            self::rules($kinds)->onlyDependOn($subject, $targets),
+        ));
     }
 
-    public static function toOnlyUsePublicApis(mixed $subject): void
+    /**
+     * @param  Expectation<mixed>  $expectation
+     */
+    public static function toOnlyUsePublicApis(Expectation $expectation): PendingRule
     {
-        self::assert((new Rules(Larch::instance()))->onlyUsePublicApis(self::moduleNames('toOnlyUsePublicApis', $subject)));
+        $modules = self::moduleNames('toOnlyUsePublicApis', $expectation->value);
+
+        return new PendingRule($expectation, fn (array $kinds) => self::assert(
+            self::rules($kinds)->onlyUsePublicApis($modules),
+        ));
     }
 
-    public static function toHaveNoCycles(mixed $subject): void
+    /**
+     * @param  Expectation<mixed>  $expectation
+     */
+    public static function toHaveNoCycles(Expectation $expectation): PendingRule
     {
-        self::assert((new Rules(Larch::instance()))->noCycles(self::moduleNames('toHaveNoCycles', $subject)));
+        $modules = self::moduleNames('toHaveNoCycles', $expectation->value);
+
+        return new PendingRule($expectation, fn (array $kinds) => self::assert(
+            self::rules($kinds)->noCycles($modules),
+        ));
+    }
+
+    /**
+     * @param  list<mixed>  $targets
+     */
+    public static function toIgnoreEventsOf(mixed $subject, array $targets): void
+    {
+        if (! $subject instanceof Module) {
+            throw self::wrongSubject('toIgnoreEventsOf', 'module(\'Name\')', $subject);
+        }
+
+        if ($targets === []) {
+            throw new LarchException('toIgnoreEventsOf() takes at least one module(\'Name\').');
+        }
+
+        foreach ($targets as $target) {
+            if (! $target instanceof Module) {
+                throw new LarchException('toIgnoreEventsOf() takes module(\'Name\'), got '.get_debug_type($target).'.');
+            }
+        }
+
+        /** @var list<Module> $targets */
+        self::assert(self::rules([EdgeKind::Event])->ignoreEventsOf($subject, $targets));
+    }
+
+    /**
+     * @param  list<EdgeKind>  $kinds
+     */
+    private static function rules(array $kinds): Rules
+    {
+        return new Rules(Larch::instance(), $kinds);
     }
 
     /**
