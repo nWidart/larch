@@ -139,10 +139,10 @@ arch('polymorphic models are in the morph map')
 
 | Subject | Narrow with | Expectation | Fails when |
 |---|---|---|---|
-| `larch()->routes()` | `prefixed('api')`, `named('admin.*')`, `except('api/health', 'admin.login')` | `toUseMiddleware(...$middleware)` | A route does not run one of the middleware. Give a name with its parameters (`auth:sanctum`), a group (`api`) or a class. |
+| `larch()->routes()` | `prefixed('api')`, `named('admin.*')`, `except('api/health', 'admin.login')` | `toUseMiddleware(...$middleware)` | A route does not run one of the middleware. Give a name with its parameters (`auth:sanctum`), a group (`api`) or a class. A group counts only when `withoutMiddleware()` removes none of its members. |
 | `larch()->models()` | `except(Pivot::class, 'App\Legacy\*')` | `toHavePolicy()` | Laravel finds no policy for a model, registered with `Gate::policy()` or found by name. |
-| `larch()->jobs()` | `queued()` | `toDefine(...$members)` | A job declares none of a property or a method with the name. |
-| `larch()->listenersOf(...$events)` | | `toBeQueued()` | A listener of a matching event does not implement `ShouldQueue`. Closure listeners are skipped. |
+| `larch()->jobs()` | `queued()` | `toDefine(...$members)` | A job does not declare the member in a form the queue reads: a property, a queue attribute such as `#[Tries(3)]`, or, for `tries`, `backoff` and `retryUntil`, a method. |
+| `larch()->listenersOf(...$events)` | | `toBeQueued()` | A listener of a matching event does not implement `ShouldQueue`, or is registered as an object, which Laravel calls at once. Wildcard registrations count. Closure listeners are skipped. |
 | `larch()->models()` | `usedInMorphs()` | `toBeInMorphMap()` | A model that a morph relation stores by class has no alias in the morph map. |
 
 - Models are the classes Larch reads that extend `Model`. Jobs are the classes that use the `Dispatchable` trait of the bus.

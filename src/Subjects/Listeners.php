@@ -7,6 +7,7 @@ namespace Nwidart\Larch\Subjects;
 use Illuminate\Container\Container;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Str;
+use ReflectionProperty;
 
 /**
  * The listeners of the events whose class matches the patterns, as the
@@ -20,9 +21,15 @@ final readonly class Listeners
     public function __construct(private array $events) {}
 
     /**
-     * @return list<array{listener: class-string, event: string}>
+     * Each listener with the event it listens to. A listener registered as
+     * an object is called at once, even when it implements ShouldQueue.
+     * A wildcard registration counts when the patterns match it, or match
+     * a scanned class it matches.
+     *
+     * @param  array<string, string>  $classes  the scanned classes, class => file
+     * @return list<array{listener: class-string, event: string, object: bool}>
      */
-    public function resolve(Container $app): array
+    public function resolve(Container $app, array $classes = []): array
     {
         $dispatcher = $app->make('events');
 
@@ -31,22 +38,27 @@ final readonly class Listeners
         }
 
         $found = [];
+        $wildcards = (new ReflectionProperty($dispatcher, 'wildcards'))->getValue($dispatcher);
 
-        foreach ($dispatcher->getRawListeners() as $event => $listeners) {
-            if (! Str::is($this->events, $event) || ! is_array($listeners)) {
-                continue;
-            }
+        foreach ([$dispatcher->getRawListeners(), is_array($wildcards) ? $wildcards : []] as $index => $registrations) {
+            foreach ($registrations as $event => $listeners) {
+                $event = (string) $event;
 
-            foreach ($listeners as $listener) {
-                $class = match (true) {
-                    is_string($listener) => explode('@', $listener)[0],
-                    is_array($listener) && is_string($listener[0] ?? null) => $listener[0],
-                    is_array($listener) && is_object($listener[0] ?? null) => $listener[0]::class,
-                    default => null,
-                };
+                if (! is_array($listeners) || ! ($index === 0 ? Str::is($this->events, $event) : $this->selects($event, $classes))) {
+                    continue;
+                }
 
-                if ($class !== null && class_exists($class)) {
-                    $found[$class.'|'.$event] = ['listener' => $class, 'event' => $event];
+                foreach ($listeners as $listener) {
+                    [$class, $object] = match (true) {
+                        is_string($listener) => [explode('@', $listener)[0], false],
+                        is_array($listener) && is_string($listener[0] ?? null) => [$listener[0], false],
+                        is_array($listener) && is_object($listener[0] ?? null) => [$listener[0]::class, true],
+                        default => [null, false],
+                    };
+
+                    if ($class !== null && class_exists($class)) {
+                        $found[$class.'|'.$event] = ['listener' => $class, 'event' => $event, 'object' => $object];
+                    }
                 }
             }
         }
@@ -54,6 +66,24 @@ final readonly class Listeners
         ksort($found);
 
         return array_values($found);
+    }
+
+    /**
+     * @param  array<string, string>  $classes
+     */
+    private function selects(string $pattern, array $classes): bool
+    {
+        if (Str::is($this->events, $pattern)) {
+            return true;
+        }
+
+        foreach (array_keys($classes) as $class) {
+            if (Str::is($pattern, $class) && Str::is($this->events, $class)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function describe(): string

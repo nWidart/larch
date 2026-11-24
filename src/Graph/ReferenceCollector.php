@@ -218,8 +218,16 @@ final class ReferenceCollector extends NodeVisitorAbstract
         if ($this->classStack !== [] && $call->var instanceof Variable && $call->var->name === 'this') {
             if (in_array($method, self::MORPH_OWN, true)) {
                 $this->morphs[$this->currentClass()] = true;
-            } elseif ($method === 'morphedbymany' && ($related = $this->key($argument)) !== null) {
-                $this->morphs[$related] = true;
+            } elseif ($method === 'morphedbymany') {
+                // The related model: the argument named related, or the first.
+                foreach ($call->getArgs() as $index => $arg) {
+                    if (($arg->name !== null ? $arg->name->toString() === 'related' : $index === 0)
+                        && ($related = $this->key($arg->value)) !== null) {
+                        $this->morphs[$related] = true;
+
+                        break;
+                    }
+                }
             }
         }
 

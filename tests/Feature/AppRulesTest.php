@@ -3,8 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Rules\AppRules;
+use Wired\Billing\Events\InvoiceIssued;
+use Wired\Catalog\Models\Product;
 
 use function Nwidart\Larch\larch;
 
@@ -51,6 +56,20 @@ describe('toUseMiddleware', function () {
                 TXT);
     });
 
+    it('checks what withoutMiddleware() removes, and tells routes apart by domain', function () {
+        $router = larch()->application()->make('router');
+        $router->domain('internal.example.com')->middleware('web')->get('reports', fn () => 'internal')->withoutMiddleware('web');
+        $router->domain('public.example.com')->middleware('web')->get('reports', fn () => 'public');
+        $router->getRoutes()->refreshNameLookups();
+
+        $result = (new AppRules(larch()))->useMiddleware(larch()->routes()->prefixed('reports'), ['web', 'auth']);
+
+        expect(array_map(fn ($finding): string => $finding->fingerprint()->from.' / '.$finding->fingerprint()->to, $result->breaches))->toBe([
+            'GET internal.example.com/reports / web, auth',
+            'GET public.example.com/reports / auth',
+        ]);
+    });
+
     it('refuses a subject that is not routes', function () {
         expect('api')->toUseMiddleware('auth');
     })->throws(LarchException::class, 'toUseMiddleware() expects larch()->routes() as its subject, got string.');
@@ -88,7 +107,10 @@ describe('toDefine', function () {
         $message = failureOf(fn () => expect(larch()->jobs()->queued())->toDefine('tries', 'timeout'));
 
         expect($message)->toBe(<<<'TXT'
-            Queued jobs define tries, timeout. 1 job breaks it:
+            Queued jobs define tries, timeout. 2 jobs break it:
+
+              Modules/Billing/Jobs/IssueRefund.php:8
+                Wired\Billing\Jobs\IssueRefund does not define timeout.
 
               Modules/Shipping/Jobs/SendLabel.php:8
                 Wired\Shipping\Jobs\SendLabel does not define tries, timeout.
@@ -114,6 +136,25 @@ describe('toBeQueued', function () {
             TXT);
     });
 
+    it('flags a listener registered as an object, and reads wildcard registrations', function () {
+        $events = larch()->application()->make('events');
+        $events->listen(InvoiceIssued::class, [new QueuedAudit, 'handle']);
+        $events->listen('Wired\Billing\Events\*', SyncAudit::class);
+
+        expect(failureOf(fn () => expect(larch()->listenersOf('Wired\Billing\Events\*'))->toBeQueued()))->toBe(<<<'TXT'
+            Listeners of Wired\Billing\Events\* are queued. 3 listeners break it:
+
+              QueuedAudit
+                QueuedAudit listens to Wired\Billing\Events\InvoiceIssued as an object, so Laravel calls it at once and does not queue it. Register the class name.
+
+              SyncAudit
+                SyncAudit listens to Wired\Billing\Events\* and is not queued. Implement ShouldQueue.
+
+              Modules/Inventory/Listeners/ReleaseHold.php:6
+                Wired\Inventory\Listeners\ReleaseHold listens to Wired\Billing\Events\InvoiceIssued and is not queued. Implement ShouldQueue.
+            TXT);
+    });
+
     it('passes when no listener matches', function () {
         expect(larch()->listenersOf('Wired\Catalog\Events\*'))->toBeQueued();
     });
@@ -130,4 +171,25 @@ describe('toBeInMorphMap', function () {
                 Wired\Catalog\Models\Product has no alias in the morph map. Add it to Relation::morphMap() or Relation::enforceMorphMap().
             TXT);
     });
+
+    it('takes 0 as an alias', function () {
+        larch()->application();
+        Relation::morphMap([0 => Product::class]);
+
+        try {
+            expect(larch()->models()->usedInMorphs())->toBeInMorphMap();
+        } finally {
+            Relation::morphMap([], false);
+        }
+    });
 });
+
+final class QueuedAudit implements ShouldQueue
+{
+    public function handle(): void {}
+}
+
+final class SyncAudit
+{
+    public function handle(): void {}
+}

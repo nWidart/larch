@@ -16,6 +16,7 @@ use Nwidart\Larch\Subjects\Jobs;
 use Nwidart\Larch\Subjects\Listeners;
 use Nwidart\Larch\Subjects\Models;
 use Nwidart\Larch\Subjects\Routes;
+use ReflectionClass;
 
 /**
  * The rules on how the app is wired: routes, models, jobs and listeners.
@@ -23,6 +24,12 @@ use Nwidart\Larch\Subjects\Routes;
  */
 final readonly class AppRules
 {
+    /** The members the queue reads from a job. */
+    private const array QUEUE_MEMBERS = ['tries', 'timeout', 'backoff', 'maxExceptions', 'retryUntil'];
+
+    /** Those it also reads from a method. */
+    private const array METHOD_MEMBERS = ['tries', 'backoff', 'retryUntil'];
+
     public function __construct(private Larch $larch) {}
 
     /**
@@ -59,7 +66,9 @@ final readonly class AppRules
             $missing = array_values(array_filter(
                 $middleware,
                 fn (string $one): bool => isset($groups[$one])
+                    // withoutMiddleware() may remove members of the group.
                     ? ! in_array($one, $declared, true)
+                        || $router->resolveMiddleware([$one], $route->excludedMiddleware()) !== $router->resolveMiddleware([$one])
                     : array_filter($this->strings($router->resolveMiddleware([$one])), fn (string $class): bool => ! $this->runs($class, $present)) !== [],
             ));
 
@@ -72,7 +81,7 @@ final readonly class AppRules
             $findings[] = new Finding($place, [
                 (string) $route->getActionName(),
                 'Middleware: '.($declared === [] ? 'none' : implode(', ', $declared)),
-            ], new Fingerprint($place, implode(', ', $middleware), 'middleware'));
+            ], new Fingerprint($place, implode(', ', $missing), 'middleware'));
         }
 
         $list = implode(', ', $middleware);
@@ -108,8 +117,10 @@ final readonly class AppRules
     }
 
     /**
-     * Every job declares each member, as a property or a method:
-     * tries, timeout, backoff, maxExceptions.
+     * Every job declares each member in a form the queue reads: a property,
+     * a queue attribute such as #[Tries(3)], or, for tries, backoff and
+     * retryUntil, a method. Laravel reads timeout and maxExceptions only
+     * from a property or an attribute.
      *
      * @param  list<string>  $members
      * @return Result<Finding>
@@ -121,7 +132,7 @@ final readonly class AppRules
         foreach ($jobs->resolve($this->larch) as $job) {
             $missing = array_values(array_filter(
                 $members,
-                fn (string $member): bool => ! property_exists($job, $member) && ! method_exists($job, $member),
+                fn (string $member): bool => ! $this->defines($job, $member),
             ));
 
             if ($missing === []) {
@@ -149,13 +160,15 @@ final readonly class AppRules
     {
         $findings = [];
 
-        foreach ($listeners->resolve($this->larch->application()) as ['listener' => $listener, 'event' => $event]) {
-            if (is_subclass_of($listener, ShouldQueue::class)) {
+        foreach ($listeners->resolve($this->larch->application(), $this->larch->graph()->classes) as ['listener' => $listener, 'event' => $event, 'object' => $object]) {
+            if (! $object && is_subclass_of($listener, ShouldQueue::class)) {
                 continue;
             }
 
             $findings[] = new Finding($this->place($listener), [
-                "{$listener} listens to {$event} and is not queued. Implement ShouldQueue.",
+                $object
+                    ? "{$listener} listens to {$event} as an object, so Laravel calls it at once and does not queue it. Register the class name."
+                    : "{$listener} listens to {$event} and is not queued. Implement ShouldQueue.",
             ], new Fingerprint($listener, $event, 'queued'));
         }
 
@@ -177,7 +190,10 @@ final readonly class AppRules
         $findings = [];
 
         foreach ($models->resolve($this->larch) as $model) {
-            if (Relation::getMorphAlias($model) !== $model) {
+            // A strict search: 0 is an alias, and getMorphAlias() skips it.
+            $alias = array_search($model, Relation::morphMap(), true);
+
+            if ($alias !== false && $alias !== $model) {
                 continue;
             }
 
@@ -220,7 +236,31 @@ final readonly class AppRules
     {
         $methods = array_values(array_diff($this->strings($route->methods()), ['HEAD']));
 
-        return implode('|', $methods).' '.$route->uri();
+        $domain = $route->getDomain();
+
+        return implode('|', $methods).' '.($domain === null || $domain === '' ? '' : $domain.'/').$route->uri();
+    }
+
+    /**
+     * Whether a job declares a member in a form the queue reads.
+     *
+     * @param  class-string  $job
+     */
+    private function defines(string $job, string $member): bool
+    {
+        if (property_exists($job, $member)) {
+            return true;
+        }
+
+        $attribute = 'Illuminate\\Queue\\Attributes\\'.ucfirst($member);
+
+        if (class_exists($attribute) && (new ReflectionClass($job))->getAttributes($attribute) !== []) {
+            return true;
+        }
+
+        $known = in_array($member, self::QUEUE_MEMBERS, true);
+
+        return method_exists($job, $member) && (! $known || in_array($member, self::METHOD_MEMBERS, true));
     }
 
     private function place(string $class): string

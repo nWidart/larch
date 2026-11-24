@@ -8,6 +8,6 @@ class Tag extends Model
 {
     public function products()
     {
-        return $this->morphedByMany(Product::class, 'taggable');
+        return $this->morphedByMany(name: 'taggable', related: Product::class);
     }
 }

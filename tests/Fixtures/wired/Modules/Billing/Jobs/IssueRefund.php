@@ -11,7 +11,11 @@ final class IssueRefund implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 30;
+    // The queue reads timeout from a property, not from a method.
+    public function timeout(): int
+    {
+        return 30;
+    }
 
     public function handle(): void {}
 }
