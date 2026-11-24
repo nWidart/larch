@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Console\Kernel;
+use Nwidart\Larch\Larch;
 
 afterEach(fn () => forgetApp($this));
 
@@ -38,9 +39,12 @@ it('prints the links between modules as JSON', function () {
             'toModule' => 'Inventory',
             'kind' => 'facade',
             'public' => false,
-            'places' => [['file' => 'Modules/Billing/Actions/ChargeOrder.php', 'line' => 18]],
-            'through' => 'the facade Wired\Shared\Facades\Stock',
-            'boundIn' => 'Modules/Inventory/Providers/InventoryServiceProvider.php:13',
+            'places' => [[
+                'file' => 'Modules/Billing/Actions/ChargeOrder.php',
+                'line' => 18,
+                'through' => 'the facade Wired\Shared\Facades\Stock',
+                'boundIn' => 'Modules/Inventory/Providers/InventoryServiceProvider.php:13',
+            ]],
         ]])
         ->and(array_column($graph['unknown'], 'line'))->toBe([19, 20]);
 });
@@ -53,14 +57,17 @@ it('reads the code only with --imports-only', function () {
         ->and($graph['unknown'])->toBe([]);
 });
 
-it('writes the HTML report with the graph in it', function () {
-    $file = sys_get_temp_dir().'/larch-graph-'.uniqid().'.html';
+it('writes the HTML report with the graph in it, in a folder it creates', function () {
+    $folder = sys_get_temp_dir().'/larch-graph-'.uniqid();
+    $file = $folder.'/build/graph.html';
 
     try {
         $run = larchGraph(['--html' => true, '--output' => $file]);
         $html = (string) file_get_contents($file);
     } finally {
         @unlink($file);
+        @rmdir($folder.'/build');
+        @rmdir($folder);
     }
 
     expect($run['exit'])->toBe(0)
@@ -70,9 +77,11 @@ it('writes the HTML report with the graph in it', function () {
         ->and($html)->toContain('"through":"the facade Wired\\\\Shared\\\\Facades\\\\Stock"');
 });
 
-it('says what is wrong when the modules are unknown', function () {
+it('says what is wrong when the modules are unknown, and keeps the larch() of the process', function () {
+    $larch = Larch::reset();
     $run = larchGraph(['--modules' => 'Wired', '--imports-only' => true]);
 
-    expect($run['exit'])->toBe(1)
+    expect(Larch::instance())->toBe($larch)
+        ->and($run['exit'])->toBe(1)
         ->and($run['output'])->toContain('larch()->modules() takes a pattern that ends in \\*');
 });

@@ -200,9 +200,9 @@ php artisan larch:graph --html                     # writes larch-graph.html, th
 php artisan larch:graph --html --output=build/graph.html
 ```
 
-Artisan does not read `tests/Pest.php`, so the configuration is in options, with the same defaults as `larch()`: `--modules='App\Modules\*'`, `--paths=app --paths=Modules`, `--public-api=Contracts --public-api=Events`. `--imports-only` reads the code only.
+Artisan does not read `tests/Pest.php`, so the configuration is in options, with the same defaults as `larch()`: `--modules='App\Modules\*'`, `--paths=app --paths=Modules`, `--public-api=Contracts --public-api=Events`. `--imports-only` reads the code only. `--output` takes a path relative to the project root, or absolute, and creates its folder. The command has its own configuration: it does not change the `larch()` of the process.
 
-The JSON has a `version` (1 today), the kinds of link it read, the modules with their class count, each link between two modules with its kind, whether it reaches the public API, its places, and how it is made, and the links Larch cannot follow. The HTML report draws the modules and their links, with each kind of link turned on and off, and lists every link and unknown link. It needs no network.
+The JSON has a `version` (1 today), the kinds of link it read, the modules with their class count, each link between two modules with its kind, whether it reaches the public API, its places, each with the facade or container key it goes through and where that is bound, and the links Larch cannot follow. The HTML report draws the modules and their links, with each kind of link turned on and off, and lists every link and unknown link. It needs no network.
 
 ## Baseline
 

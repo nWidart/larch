@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Nwidart\Larch\Exceptions\LarchException;
 use Nwidart\Larch\Export\GraphExport;
 use Nwidart\Larch\Larch;
+use Nwidart\Larch\Support\Path;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -59,7 +60,8 @@ final class GraphCommand extends Command
 
     private function larch(): Larch
     {
-        $larch = Larch::reset()->root($this->laravel->basePath());
+        // Its own instance: the larch() of the process keeps its configuration.
+        $larch = (new Larch)->root($this->laravel->basePath());
         $modules = $this->option('modules');
         $paths = $this->listOption('paths');
         $publicApi = $this->listOption('public-api');
@@ -81,9 +83,10 @@ final class GraphCommand extends Command
 
     private function write(string $file, string $contents, string $message): int
     {
-        $path = str_starts_with($file, '/') ? $file : $this->laravel->basePath($file);
+        $path = Path::isAbsolute($file) ? $file : $this->laravel->basePath($file);
+        $folder = dirname($path);
 
-        if (file_put_contents($path, $contents) === false) {
+        if ((! is_dir($folder) && ! @mkdir($folder, 0777, true) && ! is_dir($folder)) || @file_put_contents($path, $contents) === false) {
             $this->components->error("Larch could not write {$file}.");
 
             return self::FAILURE;

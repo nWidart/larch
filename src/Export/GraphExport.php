@@ -28,7 +28,7 @@ final readonly class GraphExport
      *     kinds: list<string>,
      *     publicApi: list<string>,
      *     modules: list<array{name: string, namespace: string, classes: int}>,
-     *     links: list<array{from: string, to: string, fromModule: string, toModule: string, kind: string, public: bool, places: list<array{file: string, line: int}>, through: string|null, boundIn: string|null}>,
+     *     links: list<array{from: string, to: string, fromModule: string, toModule: string, kind: string, public: bool, places: list<array{file: string, line: int, through: string|null, boundIn: string|null}>}>,
      *     unknown: list<array{from: string, module: string, file: string, line: int, reason: string, boundIn: string|null}>
      * }
      */
@@ -55,9 +55,13 @@ final readonly class GraphExport
             'toModule' => $link->toModule,
             'kind' => $link->kind->value,
             'public' => $this->larch->isPublic($link->toClass, $link->toModule),
-            'places' => array_map(fn ($edge): array => ['file' => $edge->file, 'line' => $edge->line], $link->edges),
-            'through' => $link->edges[0]->through,
-            'boundIn' => $link->edges[0]->boundIn,
+            // Each place has its own facade or key, and where that is bound.
+            'places' => array_map(fn ($edge): array => [
+                'file' => $edge->file,
+                'line' => $edge->line,
+                'through' => $edge->through,
+                'boundIn' => $edge->boundIn,
+            ], $link->edges),
         ], $this->larch->links($kinds));
 
         $unknown = [];
@@ -90,7 +94,8 @@ final readonly class GraphExport
 
     public function toJson(bool $runtime): string
     {
-        return json_encode($this->toArray($runtime), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
+        // A container key may hold bytes that are not UTF-8.
+        return json_encode($this->toArray($runtime), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)."\n";
     }
 
     /**
@@ -106,7 +111,7 @@ final readonly class GraphExport
         }
 
         // Safe inside <script>: no "</" can close the tag.
-        $data = json_encode($this->toArray($runtime), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR);
+        $data = json_encode($this->toArray($runtime), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
 
         return str_replace('/*LARCH_DATA*/null', $data, $template);
     }

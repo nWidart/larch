@@ -101,6 +101,13 @@ td { overflow-wrap: anywhere; }
     return node;
   }
   function place(p) { return p.line > 0 ? p.file + ":" + p.line : p.file; }
+  // A place, with the facade or key it goes through and where that is bound.
+  function where(p) {
+    var text = place(p);
+    if (p.through) text += ", through " + p.through;
+    if (p.boundIn) text += (p.through ? ", bound in " : ", registered in ") + p.boundIn;
+    return text;
+  }
   function color(kind, internal) { return "var(" + (internal ? "--bad" : colors[kind] || "--import") + ")"; }
 
   var internal = data.links.filter(function (link) { return !link.public; }).length;
@@ -144,7 +151,8 @@ td { overflow-wrap: anywhere; }
     return { x: c.x + dx * s, y: c.y + dy * s };
   }
 
-  var edges = document.getElementById("edges"), detail = document.getElementById("detail"), drawn = [];
+  var edges = document.getElementById("edges"), detail = document.getElementById("detail"), drawn = [], selected = null;
+  var prompt = detail.innerHTML;
   var kindsOf = {};
   Object.keys(pairs).forEach(function (key) {
     var pair = pairs[key], a = positions[pair.from], b = positions[pair.to];
@@ -159,6 +167,7 @@ td { overflow-wrap: anywhere; }
     function select() {
       drawn.forEach(function (one) { one.path.classList.remove("sel"); });
       path.classList.add("sel");
+      selected = pair.kind;
       detail.textContent = "";
       var head = html("div");
       head.appendChild(html("strong", pair.from + " → " + pair.to + " "));
@@ -168,8 +177,11 @@ td { overflow-wrap: anywhere; }
       detail.appendChild(head);
       var list = html("ul");
       pair.links.forEach(function (link) {
-        var item = html("li", link.from + " → " + link.to + " (" + place(link.places[0]) + ")" + (link.public ? "" : ", internal"));
+        var item = html("li", link.from + " → " + link.to + (link.public ? "" : ", internal"));
         item.className = "mono" + (link.public ? "" : " bad");
+        var places = html("ul");
+        link.places.forEach(function (p) { places.appendChild(html("li", where(p))); });
+        item.appendChild(places);
         list.appendChild(item);
       });
       detail.appendChild(list);
@@ -202,6 +214,12 @@ td { overflow-wrap: anywhere; }
       drawn.forEach(function (one) {
         if (one.kind === kind) { one.path.classList.toggle("off", !on[kind]); one.hit.classList.toggle("off", !on[kind]); }
       });
+      // The selected link is hidden now: show the prompt again.
+      if (!on[kind] && selected === kind) {
+        drawn.forEach(function (one) { one.path.classList.remove("sel"); });
+        detail.innerHTML = prompt;
+        selected = null;
+      }
       renderLinks();
     });
     tools.appendChild(button);
@@ -222,10 +240,9 @@ td { overflow-wrap: anywhere; }
       pill.style.color = color(link.kind, false);
       kind.appendChild(pill);
       row.appendChild(kind);
-      var where = place(link.places[0]) + (link.places.length > 1 ? " and " + (link.places.length - 1) + " more" : "");
-      if (link.through) where += ", through " + link.through;
-      if (link.boundIn) where += (link.through ? ", bound in " : ", registered in ") + link.boundIn;
-      row.appendChild(html("td", where, "mono"));
+      var cell = html("td", undefined, "mono");
+      link.places.forEach(function (p) { cell.appendChild(html("div", where(p))); });
+      row.appendChild(cell);
       body.appendChild(row);
     });
     if (shown === 0) {
