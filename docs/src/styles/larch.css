@@ -1,0 +1,199 @@
+/*
+	Larch theme. The palette comes from the tree in autumn: spruce-dark wood,
+	lichen-pale ground, gold needles. Bark red marks a link that breaks a rule,
+	and only that.
+*/
+
+@import '@fontsource/young-serif/400.css';
+@import '@fontsource-variable/schibsted-grotesk/wght.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+:root {
+	--larch-font-display: 'Young Serif', Georgia, serif;
+	--sl-font: 'Schibsted Grotesk Variable', var(--sl-font-system);
+	--sl-font-mono: 'IBM Plex Mono', var(--sl-font-system-mono);
+
+	/* Dark: spruce at night. */
+	--sl-color-white: #f1f3ec;
+	--sl-color-gray-1: #dfe5d9;
+	--sl-color-gray-2: #bfc9b9;
+	--sl-color-gray-3: #8d9b8a;
+	--sl-color-gray-4: #5d6c5f;
+	--sl-color-gray-5: #34433a;
+	--sl-color-gray-6: #1c2822;
+	--sl-color-black: #131c18;
+
+	--sl-color-accent-low: #3b2e0e;
+	--sl-color-accent: #e3ad34;
+	--sl-color-accent-high: #f2d28a;
+
+	--larch-bark: #e8836a;
+	--larch-moss: #9db880;
+
+	--grove-needle: var(--sl-color-accent);
+	--grove-branch: var(--sl-color-gray-3);
+	--grove-broken: var(--larch-bark);
+	--grove-ink: var(--sl-color-white);
+	--grove-ground: var(--sl-color-black);
+	--grove-label-font: var(--larch-font-display);
+}
+
+:root[data-theme='light'] {
+	/* Light: lichen ground, spruce ink. */
+	--sl-color-white: #15221c;
+	--sl-color-gray-1: #1f2d26;
+	--sl-color-gray-2: #34443b;
+	--sl-color-gray-3: #56665b;
+	--sl-color-gray-4: #86948a;
+	--sl-color-gray-5: #c5cec1;
+	--sl-color-gray-6: #e2e7dc;
+	--sl-color-gray-7: #e9ede3;
+	--sl-color-black: #f2f4ee;
+
+	--sl-color-accent-low: #f3e0a8;
+	--sl-color-accent: #8c5c00;
+	--sl-color-accent-high: #5a3b00;
+
+	--larch-bark: #a63c25;
+	--larch-moss: #4b6a35;
+
+	--grove-needle: #c08a12;
+}
+
+/* Type */
+
+.sl-markdown-content :is(h1, h2, h3),
+.content-panel h1 {
+	font-family: var(--larch-font-display);
+	font-weight: 400;
+	letter-spacing: -0.01em;
+}
+
+.sl-markdown-content :is(h4, h5, h6) {
+	font-weight: 650;
+}
+
+.sl-markdown-content {
+	--sl-line-height: 1.7;
+}
+
+.site-title {
+	font-family: var(--larch-font-display);
+	font-weight: 400;
+	font-size: 1.5rem;
+	color: var(--sl-color-white);
+	gap: 0.5rem;
+}
+
+.site-title img {
+	height: 1.75rem;
+	width: auto;
+}
+
+/* Links: a gold underline that thickens on hover. */
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+	color: var(--sl-color-white);
+	text-decoration-color: var(--sl-color-accent);
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 0.2em;
+}
+
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+	text-decoration-thickness: 3px;
+}
+
+/* Inline code */
+
+.sl-markdown-content :not(pre) > code {
+	border-radius: 3px;
+	padding: 0.1em 0.35em;
+	font-size: 0.875em;
+}
+
+/* Sidebar: the current page carries a gold rule, not a filled block. */
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	background: transparent;
+	color: var(--sl-color-white);
+	font-weight: 600;
+	box-shadow: inset 3px 0 0 var(--sl-color-accent);
+	border-radius: 0;
+}
+
+.sidebar-content .group-label .large {
+	font-family: var(--larch-font-display);
+	font-weight: 400;
+	font-size: var(--sl-text-lg);
+	color: var(--sl-color-white);
+}
+
+/* Buttons on the splash page */
+
+.sl-link-button {
+	border-radius: 2px;
+	font-weight: 600;
+}
+
+.sl-link-button.primary {
+	background: var(--sl-color-accent);
+	border-color: var(--sl-color-accent);
+	color: var(--sl-color-black);
+}
+
+:root[data-theme='light'] .sl-link-button.primary {
+	color: #fff;
+}
+
+/* Cards: plain blocks under a moss rule. No boxes, no shadows. */
+
+.card {
+	border: 0;
+	border-top: 2px solid var(--larch-moss);
+	border-radius: 0;
+	background: transparent;
+	padding: 1rem 0 0;
+	box-shadow: none;
+}
+
+.card .icon {
+	color: var(--larch-moss);
+	background: transparent;
+	border: 0;
+	padding: 0;
+}
+
+.card .title {
+	font-family: var(--larch-font-display);
+	font-weight: 400;
+}
+
+.card-grid {
+	gap: 2.5rem 2rem;
+}
+
+.sl-link-card {
+	border-radius: 0;
+	border-color: var(--sl-color-gray-5);
+	box-shadow: none;
+}
+
+.sl-link-card:hover {
+	border-color: var(--sl-color-accent);
+	background: transparent;
+}
+
+.sl-link-card .title {
+	font-family: var(--larch-font-display);
+	font-weight: 400;
+}
+
+/* Focus stays visible on every control. */
+
+:focus-visible {
+	outline: 2px solid var(--sl-color-accent);
+	outline-offset: 2px;
+}

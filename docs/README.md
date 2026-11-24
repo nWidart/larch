@@ -11,6 +11,11 @@ npm run build    # writes dist/
 
 Pages live in `src/content/docs`. The sidebar is in `astro.config.mjs`.
 
+The theme is in `src/styles/larch.css`. The module graph of the home page comes from `src/lib/grove.mjs`.
+`npm run social-image` draws the same graph into `public/social.png` with Google Chrome. The site uses
+that image as its `og:image`, and the README as its banner. Upload it again as the social preview
+in the repository settings on GitHub after you change it.
+
 ## Where a page goes
 
 The site follows [Diátaxis](https://diataxis.fr/). Each page does one job:
