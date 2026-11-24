@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Nwidart\Larch\Expectations;
+use Nwidart\Larch\Subjects\MortiseRules;
 use Pest\Arch\Contracts\ArchExpectation;
 use Pest\Expectation;
 
@@ -78,3 +79,17 @@ expect()->extend('toBeInMorphMap', function (): Expectation {
 
     return $this;
 });
+
+/*
+ * arch()->preset()->mortise(): the rules of mortise.json. A preset is one
+ * test, so both rules run in it and a failure lists the breaks of each.
+ */
+
+if (function_exists('pest')) {
+    pest()->presets()->custom('mortise', function (): array {
+        $expectation = expect(new MortiseRules);
+        Expectations::toFollowMortiseRules($expectation->value);
+
+        return [$expectation];
+    });
+}

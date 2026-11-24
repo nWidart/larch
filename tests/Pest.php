@@ -58,3 +58,25 @@ function forgetApp(TestCase $test): void
     Container::setInstance(null);
     Relation::morphMap([], false);
 }
+
+/**
+ * Run Pest on one test file in a separate process, as a user would.
+ *
+ * @param  array<string, string>  $environment
+ * @return array{exit: int, output: string}
+ */
+function runPest(string $file, array $environment, string ...$options): array
+{
+    $command = [PHP_BINARY, 'vendor/bin/pest', $file, '--colors=never', ...$options];
+
+    $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__), [
+        ...$environment,
+        'PATH' => (string) getenv('PATH'),
+    ]);
+
+    $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return ['exit' => proc_close($process), 'output' => (string) $output];
+}

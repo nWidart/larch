@@ -4,6 +4,8 @@
 
 ### Added
 
+- `arch()->preset()->mortise()` runs the rules of `mortise.json`: `no-circular-use` and `public-surface-only` with its folders. Shared fixture apps in `tests/Fixtures/mortise` hold the result Mortise and Larch both expect.
+
 - App rules on the booted app: `larch()->routes()` with `toUseMiddleware()`, `larch()->models()` with `toHavePolicy()` and `toBeInMorphMap()`, `larch()->jobs()` with `toDefine()`, and `larch()->listenersOf()` with `toBeQueued()`. Each takes the baseline.
 
 - Runtime pass: Larch reads the booted app for the class behind each facade and container key, the listeners of each event, and the jobs a class dispatches. Calls it cannot follow are kept as unknown links with their call site.

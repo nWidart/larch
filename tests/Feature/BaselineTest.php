@@ -22,22 +22,7 @@ afterEach(function () {
  */
 function pestOnFixture(string $baseline, array $options = [], array $env = []): array
 {
-    $command = array_merge(
-        [PHP_BINARY, 'vendor/bin/pest', 'tests/Fixtures/baseline/ModulesTest.php', '--colors=never'],
-        $options,
-    );
-
-    $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__, 2), [
-        'LARCH_BASELINE' => $baseline,
-        'PATH' => (string) getenv('PATH'),
-        ...$env,
-    ]);
-
-    $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-
-    return ['exit' => proc_close($process), 'output' => (string) $output];
+    return runPest('tests/Fixtures/baseline/ModulesTest.php', ['LARCH_BASELINE' => $baseline, ...$env], ...$options);
 }
 
 /**

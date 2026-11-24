@@ -58,9 +58,10 @@ final class Baseline
      * @template T of Breach
      *
      * @param  list<T>  $violations
+     * @param  string|null  $rule  for a test that checks several rules: the rule, added to the test name
      * @return list<T>
      */
-    public static function check(string $file, array $violations): array
+    public static function check(string $file, array $violations, ?string $rule = null): array
     {
         $test = self::currentTest();
 
@@ -68,7 +69,7 @@ final class Baseline
             return $violations;
         }
 
-        $name = $test::getPrintableTestCaseName().' > '.$test->getPrintableTestCaseMethodName();
+        $name = $test::getPrintableTestCaseName().' > '.$test->getPrintableTestCaseMethodName().($rule === null ? '' : ' > '.$rule);
         self::$tests[$file][$name] = $test;
         self::$seen[$file][$name] ??= [];
 

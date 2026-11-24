@@ -33,14 +33,14 @@ it('finds every way a class names another', function () {
         'Fixtures\Other\Named',
         'Fixtures\Other\Thrown',
         'Fixtures\Other\InsideAnonymous',
+        'Fixtures\Other\Unused',
     ]);
 });
 
-it('skips functions, constants, self, static, parent and imports that are not used', function () {
+it('skips functions, constants, self, static and parent', function () {
     expect(referencesOf('Fixtures\References\References'))
         ->not->toContain('Fixtures\Other\helper')
         ->not->toContain('Fixtures\Other\CONSTANT')
-        ->not->toContain('Fixtures\Other\Unused')
         ->not->toContain('Fixtures\References\References');
 });
 
@@ -60,8 +60,8 @@ it('records each declared class with its file, and each link with its line', fun
         ->and($created->file)->toBe('references/References.php');
 });
 
-it('links an interface to the interface it extends', function () {
-    expect(referencesOf('Fixtures\References\Second'))->toBe(['Fixtures\Other\ParentInterface']);
+it('links an interface to the interface it extends, and each class of a file to an import none uses', function () {
+    expect(referencesOf('Fixtures\References\Second'))->toBe(['Fixtures\Other\ParentInterface', 'Fixtures\Other\Unused']);
 });
 
 it('skips excluded folders and code outside classes', function () {

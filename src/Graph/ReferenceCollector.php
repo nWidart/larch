@@ -19,6 +19,8 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name\FullyQualified;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassLike;
+use PhpParser\Node\Stmt\GroupUse;
+use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeVisitorAbstract;
 use SplObjectStorage;
 
@@ -74,6 +76,9 @@ final class ReferenceCollector extends NodeVisitorAbstract
     /** @var list<string> */
     private array $classStack = [];
 
+    /** @var list<array{class: string, line: int}> the classes the file imports with "use" */
+    private array $imports = [];
+
     /** @var SplObjectStorage<Node, true> */
     private SplObjectStorage $skip;
 
@@ -87,6 +92,12 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     public function enterNode(Node $node): null
     {
+        if ($node instanceof Use_ || $node instanceof GroupUse) {
+            $this->collectImports($node);
+
+            return null;
+        }
+
         if ($node instanceof ClassLike && $node->namespacedName !== null) {
             $class = $node->namespacedName->toString();
             $this->declared[] = $class;
@@ -128,6 +139,36 @@ final class ReferenceCollector extends NodeVisitorAbstract
         return null;
     }
 
+    /**
+     * An import no class of the file uses still makes each class of the file
+     * depend on the imported class, at the line of the import, as Mortise
+     * counts it. An import of a namespace, used as Contracts\Prices, is used.
+     *
+     * @param  array<Node>  $nodes
+     */
+    public function afterTraverse(array $nodes): null
+    {
+        $used = array_column($this->references, 'to');
+
+        foreach ($this->imports as ['class' => $import, 'line' => $line]) {
+            if (in_array($import, $this->declared, true)) {
+                continue;
+            }
+
+            foreach ($used as $to) {
+                if ($to === $import || str_starts_with($to, $import.'\\')) {
+                    continue 2;
+                }
+            }
+
+            foreach ($this->declared as $class) {
+                $this->references[] = ['from' => $class, 'to' => $import, 'line' => $line];
+            }
+        }
+
+        return null;
+    }
+
     public function leaveNode(Node $node): null
     {
         if ($node instanceof ClassLike && $node->namespacedName !== null) {
@@ -135,6 +176,19 @@ final class ReferenceCollector extends NodeVisitorAbstract
         }
 
         return null;
+    }
+
+    private function collectImports(Use_|GroupUse $use): void
+    {
+        $prefix = $use instanceof GroupUse ? $use->prefix->toString().'\\' : '';
+
+        foreach ($use->uses as $item) {
+            $type = $item->type === Use_::TYPE_UNKNOWN ? $use->type : $item->type;
+
+            if ($type === Use_::TYPE_NORMAL) {
+                $this->imports[] = ['class' => $prefix.$item->name->toString(), 'line' => $item->getStartLine()];
+            }
+        }
     }
 
     private function collectFunctionCall(FuncCall $call): void

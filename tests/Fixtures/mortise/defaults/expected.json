@@ -1,0 +1,9 @@
+{
+    "no-circular-use": [
+        ["Checkout", "Shipping"]
+    ],
+    "public-surface-only": [
+        {"from": "Modules\\Billing\\Actions\\ChargeOrder", "to": "Modules\\Catalog\\Pricing\\PriceEngine"},
+        {"from": "Modules\\Billing\\Models\\Invoice", "to": "Modules\\Shared\\Money\\Money"}
+    ]
+}
