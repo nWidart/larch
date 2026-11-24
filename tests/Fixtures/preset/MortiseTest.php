@@ -11,6 +11,6 @@ beforeEach(fn () => Larch::reset()
     ->root((string) getenv('LARCH_APP'))
     ->paths('Modules')
     ->modules('Modules\*')
-    ->baseline(sys_get_temp_dir().'/larch-preset-none.json'));
+    ->baseline(getenv('LARCH_BASELINE') ?: sys_get_temp_dir().'/larch-preset-none.json'));
 
 arch()->preset()->mortise();

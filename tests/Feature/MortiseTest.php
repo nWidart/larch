@@ -3,10 +3,9 @@
 declare(strict_types=1);
 
 use Nwidart\Larch\Exceptions\LarchException;
-use Nwidart\Larch\Graph\EdgeKind;
 use Nwidart\Larch\Larch;
 use Nwidart\Larch\Mortise\MortiseConfig;
-use Nwidart\Larch\Rules\Rules;
+use Nwidart\Larch\Mortise\MortisePreset;
 use Nwidart\Larch\Rules\StronglyConnected;
 use Nwidart\Larch\Rules\Violation;
 
@@ -25,17 +24,13 @@ function mortiseApp(string $app): Larch
  */
 function mortiseResult(string $app): array
 {
-    $larch = mortiseApp($app);
-    $config = MortiseConfig::read($larch->projectRoot());
-    $modules = array_keys($larch->moduleMap());
-    $rules = new Rules($larch, [EdgeKind::Import], $config->folders);
-
+    $results = (new MortisePreset(mortiseApp($app)))->results();
     $cycles = null;
 
-    if ($config->noCircularUse) {
+    if (isset($results['no-circular-use'])) {
         $adjacency = [];
 
-        foreach ($rules->noCycles($modules)->breaches as $violation) {
+        foreach ($results['no-circular-use']->breaches as $violation) {
             $adjacency[$violation->link->fromModule][$violation->link->toModule] = true;
         }
 
@@ -44,10 +39,10 @@ function mortiseResult(string $app): array
 
     $links = null;
 
-    if ($config->publicSurfaceOnly) {
+    if (isset($results['public-surface-only'])) {
         $links = array_values(array_unique(array_map(
             fn (Violation $violation): array => ['from' => $violation->link->fromClass, 'to' => $violation->link->toClass],
-            $rules->onlyUsePublicApis($modules)->breaches,
+            $results['public-surface-only']->breaches,
         ), SORT_REGULAR));
     }
 
@@ -58,7 +53,7 @@ it('agrees with the expected result of each shared fixture app', function (strin
     $expected = json_decode((string) file_get_contents(__DIR__."/../Fixtures/mortise/{$app}/expected.json"), true);
 
     expect(mortiseResult($app))->toBe($expected);
-})->with(['defaults', 'custom-folders', 'all-off']);
+})->with(['defaults', 'custom-folders', 'all-off', 'module-off']);
 
 it('runs the rules of mortise.json through the preset, in one test', function () {
     $run = runPest('tests/Fixtures/preset/MortiseTest.php', ['LARCH_APP' => realpath(__DIR__.'/../Fixtures/mortise/defaults')]);
@@ -85,6 +80,25 @@ it('runs the rules of mortise.json through the preset, in one test', function ()
                 Modules\Billing\Models\Invoice uses Modules\Shared\Money\Money
                 It is internal to Shared. The public API of a module is: Contracts, Events.
             TXT);
+});
+
+it('keeps the baseline entries of each rule apart', function () {
+    $baseline = sys_get_temp_dir().'/larch-preset-'.uniqid().'.json';
+
+    try {
+        runPest('tests/Fixtures/preset/MortiseTest.php', ['LARCH_APP' => realpath(__DIR__.'/../Fixtures/mortise/defaults'), 'LARCH_BASELINE' => $baseline], '--update-larch-baseline');
+
+        expect(array_keys(json_decode((string) file_get_contents($baseline), true)['tests']))->toBe([
+            'Tests\Fixtures\preset\MortiseTest > preset  → mortise  > no-circular-use',
+            'Tests\Fixtures\preset\MortiseTest > preset  → mortise  > public-surface-only',
+        ]);
+    } finally {
+        @unlink($baseline);
+    }
+});
+
+it('reads no module when both rules are off', function () {
+    expect((new MortisePreset(Larch::reset()->root(__DIR__.'/../Fixtures/mortise/all-off')))->results())->toBe([]);
 });
 
 it('passes the preset when the rules are off', function () {
@@ -136,5 +150,19 @@ describe('mortise.json', function () {
         ['{"rules": {"no-circular-use": "yes"}}', '"no-circular-use" is not true or false'],
         ['{"rules": {"public-surface-only": true}}', '"public-surface-only" is not an object'],
         ['{"rules": {"public-surface-only": {"folders": "Contracts"}}}', '"public-surface-only.folders" is not a list of folder names'],
+        ['[]', 'the file is not a JSON object'],
+        ['{"rules": null}', '"rules" is not an object'],
+        ['{"rules": {"no-circular-use": null}}', '"no-circular-use" is not true or false'],
+        ['{"rules": {"public-surface-only": {"folders": {"0": "Pricing"}}}}', '"public-surface-only.folders" is not a list of folder names'],
     ]);
+
+    it('stops on a path it cannot read as a file', function () {
+        mkdir($this->app.'/mortise.json');
+
+        try {
+            expect(fn () => MortiseConfig::read($this->app))->toThrow(LarchException::class, 'Larch could not read');
+        } finally {
+            rmdir($this->app.'/mortise.json');
+        }
+    });
 });

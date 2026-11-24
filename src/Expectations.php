@@ -7,7 +7,7 @@ namespace Nwidart\Larch;
 use Nwidart\Larch\Baseline\Baseline;
 use Nwidart\Larch\Exceptions\LarchException;
 use Nwidart\Larch\Graph\EdgeKind;
-use Nwidart\Larch\Mortise\MortiseConfig;
+use Nwidart\Larch\Mortise\MortisePreset;
 use Nwidart\Larch\Rules\AppRules;
 use Nwidart\Larch\Rules\Breach;
 use Nwidart\Larch\Rules\Result;
@@ -161,21 +161,7 @@ final class Expectations
             throw self::wrongSubject('toFollowMortiseRules', 'the mortise preset', $subject);
         }
 
-        $larch = Larch::instance();
-        $config = MortiseConfig::read($larch->projectRoot());
-        $modules = array_keys($larch->moduleMap());
-        $rules = new Rules($larch, [EdgeKind::Import], $config->folders);
-        $results = [];
-
-        if ($config->noCircularUse) {
-            $results['mortise.json, no-circular-use:'] = $rules->noCycles($modules);
-        }
-
-        if ($config->publicSurfaceOnly) {
-            $results['mortise.json, public-surface-only:'] = $rules->onlyUsePublicApis($modules);
-        }
-
-        self::assert(Result::combine($results));
+        self::assertRules((new MortisePreset(Larch::instance()))->results(), 'mortise.json, ');
     }
 
     /**
@@ -241,17 +227,40 @@ final class Expectations
      */
     private static function assert(Result $result): void
     {
-        $larch = Larch::instance();
-        $new = Baseline::check($larch->baselinePath(), $result->breaches);
+        self::assertRules(['' => $result]);
+    }
 
-        if ($new === []) {
+    /**
+     * Fail on the violations the baseline does not accept, for several rules
+     * in one test. Each rule has its own entries in the baseline, and its own
+     * part of the message, under its name.
+     *
+     * @template T of Breach
+     *
+     * @param  array<string, Result<T>>  $results  rule => result; '' for a test of one rule
+     */
+    private static function assertRules(array $results, string $title = ''): void
+    {
+        $larch = Larch::instance();
+        $parts = [];
+        $accepted = 0;
+
+        foreach ($results as $rule => $result) {
+            $new = Baseline::check($larch->baselinePath(), $result->breaches, $rule === '' ? null : $rule);
+            $accepted += count($result->breaches) - count($new);
+
+            if ($new !== []) {
+                $parts[] = ($rule === '' ? '' : "{$title}{$rule}:\n").$result->report($new);
+            }
+        }
+
+        if ($parts === []) {
             expect(true)->toBeTrue();
 
             return;
         }
 
-        $message = $result->report($new);
-        $accepted = count($result->breaches) - count($new);
+        $message = implode("\n\n", $parts);
 
         if ($accepted > 0) {
             $message .= "\n\n".$accepted.' more '.($accepted === 1 ? 'violation is' : 'violations are').' in the baseline, '.basename($larch->baselinePath()).'.';

@@ -6,6 +6,7 @@ Each folder is an app with laravel-modules' layout:
 
 - `Modules/<Name>/module.json` and `Modules/<Name>/app/...`, namespace `Modules\<Name>\...`.
 - `mortise.json`, when the app has one. Without it, the defaults apply: both rules on, public folders `Contracts` and `Events`.
+- `modules_statuses.json`, when the app turns modules off. A module that is off breaks no rule, and no link to it does.
 - `expected.json`, the result on imports:
 
 ```json
@@ -25,3 +26,4 @@ Each folder is an app with laravel-modules' layout:
 | `defaults` | No `mortise.json`. A cycle between Checkout and Shipping through public classes. Two links to internal classes. |
 | `custom-folders` | Other keys in the file are kept. `no-circular-use` is off while Billing and Catalog use each other. The folders are `contracts`, in lower case, and `Money`. |
 | `all-off` | The code of `defaults`, with both rules off. |
+| `module-off` | The code of `defaults`, with Shared and Shipping off: no cycle, and Billing may use Shared. Checkout imports an internal class of Catalog and never uses it. |

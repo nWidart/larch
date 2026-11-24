@@ -84,7 +84,7 @@ arch('inventory does not react to billing events')
 
 | Kind | Link |
 |---|---|
-| `Edge::imports()` | A class named in the code. The default. |
+| `Edge::imports()` | A class named in the code. The default. An import that no class of the file uses links each class of the file to it. |
 | `Edge::facades()` | A static call on a facade, to the class bound to the facade's key. Real-time facades too. Laravel's own facades are skipped. |
 | `Edge::container()` | `app('key')`, `resolve('key')`, `App::make('key')` or `$this->app->make('key')` with a string key, to the class bound to the key. A key that names a class is already an import. |
 | `Edge::events()` | A listener, to the event it listens to, as the app registers it: `Event::listen()`, event discovery and closures. A wildcard such as `'App\Billing\Events\*'` links the listener to each scanned class it matches; a pattern with no namespace before its `*` is skipped. |
@@ -181,11 +181,12 @@ The preset reads `mortise.json` at the project root, as Mortise reads it:
 ```
 
 - `no-circular-use` is `toHaveNoCycles()` on every module.
-- `public-surface-only` is `toOnlyUsePublicApis()` on every module, with the folders of the file as the public API. A folder matches the first namespace inside a module, in any case.
-- Without the file, or without a key, the default applies: both rules on, folders `Contracts` and `Events`.
-- A file Larch cannot read stops the test. Mortise uses the defaults then; CI should not pass on rules nobody wrote.
-- A preset is one Pest test. Both rules run in it, and the failure lists the breaks of each rule under its name.
-- The rules check imports, as Mortise does.
+- `public-surface-only` is `toOnlyUsePublicApis()` on every module, with the folders of the file as the public API. A folder matches the first namespace inside a module, in any case, so a folder such as `Internal\Api` matches no class.
+- Without the file, or without a key, the default applies: both rules on, folders `Contracts` and `Events`. A key that is there must hold a valid value; `null` is not one.
+- A file Larch cannot read stops the test, and so does a folder or a broken link at its path. Mortise uses the defaults then; CI should not pass on rules nobody wrote.
+- A module that `modules_statuses.json`, at the project root, turns off breaks no rule, and no link to it does.
+- A preset is one Pest test. Both rules run in it, and the failure lists the breaks of each rule under its name. Each rule has its own entries in the baseline.
+- The rules check imports, as Mortise does. An import no class of the file uses counts too.
 
 `tests/Fixtures/mortise` holds small apps with the result each one expects, so Mortise and Larch can check they agree.
 

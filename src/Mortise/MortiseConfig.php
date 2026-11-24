@@ -6,6 +6,7 @@ namespace Nwidart\Larch\Mortise;
 
 use JsonException;
 use Nwidart\Larch\Exceptions\LarchException;
+use stdClass;
 
 /**
  * The rules of mortise.json, the file Mortise keeps in the app folder:
@@ -40,6 +41,11 @@ final readonly class MortiseConfig
         $path = rtrim($root, '/').'/'.self::FILE;
 
         if (! is_file($path)) {
+            // A folder or a broken link at the path is not a missing file.
+            if (file_exists($path) || is_link($path)) {
+                throw new LarchException("Larch could not read {$path}.");
+            }
+
             return new self;
         }
 
@@ -50,41 +56,44 @@ final readonly class MortiseConfig
         }
 
         try {
-            $file = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            // Objects stay objects, so {"0": "Pricing"} is not a list.
+            $file = json_decode($contents, false, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $error) {
             throw new LarchException("{$path} is not valid JSON: {$error->getMessage()}.", previous: $error);
         }
 
-        if (! is_array($file) || array_is_list($file) && $file !== []) {
+        if (! $file instanceof stdClass) {
             throw self::invalid($path, 'the file is not a JSON object');
         }
 
-        $rules = $file['rules'] ?? [];
+        // A missing key is the default. A key that is there must be valid,
+        // null included.
+        $rules = property_exists($file, 'rules') ? $file->rules : new stdClass;
 
-        if (! is_array($rules)) {
+        if (! $rules instanceof stdClass) {
             throw self::invalid($path, '"rules" is not an object');
         }
 
-        $cycles = $rules['no-circular-use'] ?? true;
+        $cycles = property_exists($rules, 'no-circular-use') ? $rules->{'no-circular-use'} : true;
 
         if (! is_bool($cycles)) {
             throw self::invalid($path, '"no-circular-use" is not true or false');
         }
 
-        $surface = $rules['public-surface-only'] ?? [];
+        $surface = property_exists($rules, 'public-surface-only') ? $rules->{'public-surface-only'} : new stdClass;
 
-        if (! is_array($surface)) {
+        if (! $surface instanceof stdClass) {
             throw self::invalid($path, '"public-surface-only" is not an object');
         }
 
-        $enabled = $surface['enabled'] ?? true;
-        $folders = $surface['folders'] ?? ['Contracts', 'Events'];
+        $enabled = property_exists($surface, 'enabled') ? $surface->enabled : true;
+        $folders = property_exists($surface, 'folders') ? $surface->folders : ['Contracts', 'Events'];
 
         if (! is_bool($enabled)) {
             throw self::invalid($path, '"public-surface-only.enabled" is not true or false');
         }
 
-        if (! is_array($folders) || ! array_is_list($folders) || array_filter($folders, fn (mixed $folder): bool => ! is_string($folder)) !== []) {
+        if (! is_array($folders) || array_filter($folders, fn (mixed $folder): bool => ! is_string($folder)) !== []) {
             throw self::invalid($path, '"public-surface-only.folders" is not a list of folder names');
         }
 

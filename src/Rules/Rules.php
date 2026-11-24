@@ -21,11 +21,13 @@ final readonly class Rules
     /**
      * @param  list<EdgeKind>  $kinds  the kinds of link the rules check
      * @param  list<string>|null  $publicApi  instead of the namespaces set with larch()->publicApi()
+     * @param  list<string>  $off  modules that are off: they and the links to them break no rule
      */
     public function __construct(
         private Larch $larch,
         private array $kinds = [EdgeKind::Import],
         private ?array $publicApi = null,
+        private array $off = [],
     ) {}
 
     /**
@@ -115,10 +117,10 @@ final readonly class Rules
      */
     public function noCycles(array $modules): Result
     {
-        $links = $this->larch->links($this->kinds);
+        $links = $this->links();
         $adjacency = [];
 
-        foreach (array_keys($this->larch->moduleMap()) as $module) {
+        foreach (array_diff(array_keys($this->larch->moduleMap()), $this->off) as $module) {
             $adjacency[$module] = [];
         }
 
@@ -208,8 +210,28 @@ final readonly class Rules
     private function linksFrom(array $modules): array
     {
         return array_values(array_filter(
-            $this->larch->links($this->kinds),
+            $this->links(),
             fn (ModuleLink $link): bool => in_array($link->fromModule, $modules, true),
+        ));
+    }
+
+    /**
+     * The links of the kinds the rules check, except those of modules that
+     * are off.
+     *
+     * @return list<ModuleLink>
+     */
+    private function links(): array
+    {
+        $links = $this->larch->links($this->kinds);
+
+        if ($this->off === []) {
+            return $links;
+        }
+
+        return array_values(array_filter(
+            $links,
+            fn (ModuleLink $link): bool => ! in_array($link->fromModule, $this->off, true) && ! in_array($link->toModule, $this->off, true),
         ));
     }
 
