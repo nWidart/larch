@@ -190,6 +190,20 @@ The preset reads `mortise.json` at the project root, as Mortise reads it:
 
 `tests/Fixtures/mortise` holds small apps with the result each one expects, so Mortise and Larch can check they agree.
 
+## Graph export
+
+`php artisan larch:graph` exports the graph of modules from the running app:
+
+```bash
+php artisan larch:graph --json > graph.json        # the default; Mortise reads this format
+php artisan larch:graph --html                     # writes larch-graph.html, the report
+php artisan larch:graph --html --output=build/graph.html
+```
+
+Artisan does not read `tests/Pest.php`, so the configuration is in options, with the same defaults as `larch()`: `--modules='App\Modules\*'`, `--paths=app --paths=Modules`, `--public-api=Contracts --public-api=Events`. `--imports-only` reads the code only. `--output` takes a path relative to the project root, or absolute, and creates its folder. The command has its own configuration: it does not change the `larch()` of the process.
+
+The JSON has a `version` (1 today), the kinds of link it read, the modules with their class count, each link between two modules with its kind, whether it reaches the public API, its places, each with the facade or container key it goes through and where that is bound, and the links Larch cannot follow. The HTML report draws the modules and their links, with each kind of link turned on and off, and lists every link and unknown link. It needs no network.
+
 ## Baseline
 
 An existing app breaks rules on its first run. A baseline accepts today's violations, so a test fails only on new ones.

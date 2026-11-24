@@ -4,6 +4,8 @@
 
 ### Added
 
+- `php artisan larch:graph`, registered by package discovery: `--json` prints the graph of modules in a versioned format, `--html` writes a self-contained report with the graph and every link.
+
 - `arch()->preset()->mortise()` runs the rules of `mortise.json`: `no-circular-use` and `public-surface-only` with its folders. Shared fixture apps in `tests/Fixtures/mortise` hold the result Mortise and Larch both expect.
 
 - App rules on the booted app: `larch()->routes()` with `toUseMiddleware()`, `larch()->models()` with `toHavePolicy()` and `toBeInMorphMap()`, `larch()->jobs()` with `toDefine()`, and `larch()->listenersOf()` with `toBeQueued()`. Each takes the baseline.

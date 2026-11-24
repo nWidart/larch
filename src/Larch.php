@@ -19,6 +19,7 @@ use Nwidart\Larch\Subjects\Jobs;
 use Nwidart\Larch\Subjects\Listeners;
 use Nwidart\Larch\Subjects\Models;
 use Nwidart\Larch\Subjects\Routes;
+use Nwidart\Larch\Support\Path;
 
 /**
  * The configuration of Larch for one test run, and the graph it builds.
@@ -152,8 +153,7 @@ final class Larch
 
     public function baselinePath(): string
     {
-        // /path, C:/path, C:\path and \\server\share are absolute.
-        return preg_match('~^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)~', $this->baseline) === 1
+        return Path::isAbsolute($this->baseline)
             ? $this->baseline
             : $this->projectRoot().'/'.$this->baseline;
     }
