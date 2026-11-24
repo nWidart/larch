@@ -1,0 +1,292 @@
+---
+title: Getting started
+description: Install Larch in a new Laravel app, split it into modules, and write the rules that keep them apart.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+In this tutorial we build a small Laravel app with two modules, Billing and Catalog.
+We write a rule that keeps them apart, watch it fail, fix the code, and watch it pass.
+It takes about fifteen minutes.
+
+You need PHP 8.3 or later and Composer.
+
+## Create the app
+
+<Steps>
+
+1. Create a new Laravel app and go into its folder:
+
+   ```bash
+   composer create-project laravel/laravel shop
+   cd shop
+   ```
+
+2. Larch is a Pest plugin. Replace PHPUnit with Pest:
+
+   ```bash
+   composer remove phpunit/phpunit --dev
+   composer require pestphp/pest --dev --with-all-dependencies
+   ./vendor/bin/pest --init
+   ```
+
+   Pest creates `tests/Pest.php`.
+
+3. Install Larch:
+
+   ```bash
+   composer require nwidart/larch --dev
+   ```
+
+</Steps>
+
+## Add two modules
+
+A module is a namespace. Ours live under `App\Modules`, in `app/Modules`.
+
+<Steps>
+
+1. Catalog prices orders. Create `app/Modules/Catalog/Pricing/PriceEngine.php`:
+
+   ```php
+   <?php
+
+   namespace App\Modules\Catalog\Pricing;
+
+   class PriceEngine
+   {
+       public function quote(array $lines): int
+       {
+           return array_sum(array_column($lines, 'price'));
+       }
+   }
+   ```
+
+2. Billing charges orders, and asks Catalog for the price.
+   Create `app/Modules/Billing/Actions/ChargeOrder.php`:
+
+   ```php
+   <?php
+
+   namespace App\Modules\Billing\Actions;
+
+   use App\Modules\Catalog\Pricing\PriceEngine;
+
+   class ChargeOrder
+   {
+       public function handle(array $lines): int
+       {
+           return (new PriceEngine)->quote($lines);
+       }
+   }
+   ```
+
+</Steps>
+
+## Tell Larch about the modules
+
+Add these lines at the end of `tests/Pest.php`:
+
+```php title="tests/Pest.php"
+Nwidart\Larch\larch()
+    ->modules('App\Modules\*')
+    ->publicApi('Contracts');
+```
+
+Each namespace directly under `App\Modules` is now a module: `Billing` and `Catalog`.
+Other modules may use only the classes in a module's `Contracts` namespace. That is its public API.
+
+## Write the first rule
+
+Create `tests/Arch/ModulesTest.php`:
+
+```php title="tests/Arch/ModulesTest.php"
+<?php
+
+use function Nwidart\Larch\modules;
+
+arch('modules use each other only through their public API')
+    ->expect(modules())
+    ->toOnlyUsePublicApis();
+```
+
+Run it:
+
+```bash
+./vendor/bin/pest tests/Arch
+```
+
+The test fails, and tells us where and why:
+
+```
+Modules use other modules only through their public API. 1 link breaks it:
+
+  app/Modules/Billing/Actions/ChargeOrder.php:11
+    App\Modules\Billing\Actions\ChargeOrder uses App\Modules\Catalog\Pricing\PriceEngine
+    It is internal to Catalog. The public API of a module is: Contracts.
+```
+
+Billing reaches into Catalog's `Pricing` namespace. `PriceEngine` is internal to Catalog.
+
+## Fix the code
+
+Catalog will offer an interface in its public API, and Billing will use that.
+
+<Steps>
+
+1. Create `app/Modules/Catalog/Contracts/PricesOrders.php`:
+
+   ```php
+   <?php
+
+   namespace App\Modules\Catalog\Contracts;
+
+   interface PricesOrders
+   {
+       public function quote(array $lines): int;
+   }
+   ```
+
+2. Make `PriceEngine` implement it:
+
+   ```php title="app/Modules/Catalog/Pricing/PriceEngine.php" ins={5,7}
+   <?php
+
+   namespace App\Modules\Catalog\Pricing;
+
+   use App\Modules\Catalog\Contracts\PricesOrders;
+
+   class PriceEngine implements PricesOrders
+   {
+       public function quote(array $lines): int
+       {
+           return array_sum(array_column($lines, 'price'));
+       }
+   }
+   ```
+
+3. Make `ChargeOrder` ask for the interface:
+
+   ```php title="app/Modules/Billing/Actions/ChargeOrder.php"
+   <?php
+
+   namespace App\Modules\Billing\Actions;
+
+   use App\Modules\Catalog\Contracts\PricesOrders;
+
+   class ChargeOrder
+   {
+       public function __construct(private PricesOrders $prices) {}
+
+       public function handle(array $lines): int
+       {
+           return $this->prices->quote($lines);
+       }
+   }
+   ```
+
+4. Run the rule again:
+
+   ```bash
+   ./vendor/bin/pest tests/Arch
+   ```
+
+   It passes.
+
+</Steps>
+
+## Say what Billing may use
+
+The first rule checks how modules use each other. Now we say which modules Billing may use at all.
+
+<Steps>
+
+1. Add a second rule to `tests/Arch/ModulesTest.php`:
+
+   ```php title="tests/Arch/ModulesTest.php" ins={3,10-12}
+   <?php
+
+   use function Nwidart\Larch\module;
+   use function Nwidart\Larch\modules;
+
+   arch('modules use each other only through their public API')
+       ->expect(modules())
+       ->toOnlyUsePublicApis();
+
+   arch('billing uses only the public API of catalog')
+       ->expect(module('Billing'))
+       ->toOnlyDependOn(module('Catalog')->publicApi());
+   ```
+
+   Run the tests. Both pass.
+
+2. Add a third module. Create `app/Modules/Shipping/Actions/ShipOrder.php`:
+
+   ```php
+   <?php
+
+   namespace App\Modules\Shipping\Actions;
+
+   class ShipOrder
+   {
+       public function handle(int $orderId): void
+       {
+           //
+       }
+   }
+   ```
+
+3. Make Billing ship the order once it is charged:
+
+   ```php title="app/Modules/Billing/Actions/ChargeOrder.php"
+   <?php
+
+   namespace App\Modules\Billing\Actions;
+
+   use App\Modules\Catalog\Contracts\PricesOrders;
+   use App\Modules\Shipping\Actions\ShipOrder;
+
+   class ChargeOrder
+   {
+       public function __construct(
+           private PricesOrders $prices,
+           private ShipOrder $shipping,
+       ) {}
+
+       public function handle(int $orderId, array $lines): int
+       {
+           $total = $this->prices->quote($lines);
+           $this->shipping->handle($orderId);
+
+           return $total;
+       }
+   }
+   ```
+
+4. Run the tests. Both rules fail now. The second one says:
+
+   ```
+   Module Billing may only depend on Catalog (public API). 1 link breaks it:
+
+     app/Modules/Billing/Actions/ChargeOrder.php:12
+       App\Modules\Billing\Actions\ChargeOrder uses App\Modules\Shipping\Actions\ShipOrder
+       Billing may not depend on Shipping.
+   ```
+
+   The rule caught a new link between modules the moment it appeared.
+
+5. Undo step 3: put back the `ChargeOrder` from the section above. Run the tests. Both pass again.
+
+</Steps>
+
+## What we did
+
+We split an app into modules, gave a module a public API, and wrote two rules:
+one on how modules use each other, one on which modules Billing may use.
+Each failure named the file, the line and the classes of the link.
+
+## Next steps
+
+- [Define your modules](/larch/guides/define-modules/) in a real app, or with `nwidart/laravel-modules`.
+- [Check the links the app makes](/larch/guides/runtime-links/): facades, the container, events and jobs.
+- [Adopt Larch in an existing app](/larch/guides/baseline/) that already breaks rules.

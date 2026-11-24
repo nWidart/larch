@@ -2,6 +2,8 @@
 
 Architecture rules for Laravel apps, as a Pest plugin. Larch checks which module uses which, and prints every link that breaks a rule with the file and line it comes from.
 
+Read the documentation at **[nwidart.github.io/larch](https://nwidart.github.io/larch/)**.
+
 Larch is in early development. It finds links in two ways:
 
 - From the code: class names in types, `new`, static calls, `::class`, attributes, `extends` and `implements`.

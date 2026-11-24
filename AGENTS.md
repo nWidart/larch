@@ -11,6 +11,13 @@ between classes (`src/Graph`) and checks module rules on that graph (`src/Rules`
 
 Run all three before you commit. CI runs them on PHP 8.3, 8.4 and 8.5.
 
+## Documentation
+
+The documentation site is in `docs`, built with Starlight and deployed to GitHub Pages by
+`.github/workflows/docs.yml`. Run `npm run build` in `docs` before you commit a change there.
+`docs/README.md` says which folder a page belongs in. A change to behavior that users see updates
+its reference page and the guide that uses it, in the same pull request.
+
 ## Branches and worktrees
 
 Every task runs in its own git worktree on its own branch. This keeps a commit on the branch it belongs to.
