@@ -9,6 +9,28 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Larch',
+			logo: {
+				light: './src/assets/logo-light.svg',
+				dark: './src/assets/logo-dark.svg',
+			},
+			customCss: ['./src/styles/larch.css'],
+			components: {
+				Hero: './src/components/Hero.astro',
+			},
+			expressiveCode: {
+				themes: ['everforest-dark', 'everforest-light'],
+				styleOverrides: {
+					borderRadius: '2px',
+					codeBackground: ({ theme }) => (theme.type === 'dark' ? '#1c2822' : '#e9ede3'),
+					borderColor: ({ theme }) => (theme.type === 'dark' ? '#34433a' : '#c5cec1'),
+					frames: { frameBoxShadowCssValue: 'none' },
+					codeFontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+				},
+			},
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://nwidart.github.io/larch/social.png' } },
+				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+			],
 			description:
 				'Architecture rules for Laravel apps, as a Pest plugin. Larch sees the links that facades, the container, events and jobs make.',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/nwidart/larch' }],

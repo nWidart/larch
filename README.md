@@ -1,5 +1,7 @@
 # Larch
 
+![Larch: architecture rules for Laravel apps, as a Pest plugin](docs/public/social.png)
+
 Architecture rules for Laravel apps, as a Pest plugin. Larch checks which module uses which, and prints every link that breaks a rule with the file and line it comes from.
 
 Read the documentation at **[nwidart.github.io/larch](https://nwidart.github.io/larch/)**.
