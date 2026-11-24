@@ -7,11 +7,17 @@ namespace Nwidart\Larch;
 use Nwidart\Larch\Baseline\Baseline;
 use Nwidart\Larch\Exceptions\LarchException;
 use Nwidart\Larch\Graph\EdgeKind;
+use Nwidart\Larch\Rules\AppRules;
+use Nwidart\Larch\Rules\Breach;
 use Nwidart\Larch\Rules\Result;
 use Nwidart\Larch\Rules\Rules;
+use Nwidart\Larch\Subjects\Jobs;
+use Nwidart\Larch\Subjects\Listeners;
+use Nwidart\Larch\Subjects\Models;
 use Nwidart\Larch\Subjects\Module;
 use Nwidart\Larch\Subjects\Modules;
 use Nwidart\Larch\Subjects\PublicApi;
+use Nwidart\Larch\Subjects\Routes;
 use Pest\Expectation;
 use PHPUnit\Framework\ExpectationFailedException;
 
@@ -94,6 +100,85 @@ final class Expectations
     }
 
     /**
+     * @param  list<mixed>  $middleware
+     */
+    public static function toUseMiddleware(mixed $subject, array $middleware): void
+    {
+        if (! $subject instanceof Routes) {
+            throw self::wrongSubject('toUseMiddleware', 'larch()->routes()', $subject);
+        }
+
+        self::assert(self::appRules()->useMiddleware($subject, self::names('toUseMiddleware', 'a middleware', $middleware)));
+    }
+
+    public static function toHavePolicy(mixed $subject): void
+    {
+        if (! $subject instanceof Models) {
+            throw self::wrongSubject('toHavePolicy', 'larch()->models()', $subject);
+        }
+
+        self::assert(self::appRules()->havePolicy($subject));
+    }
+
+    /**
+     * @param  list<mixed>  $members
+     */
+    public static function toDefine(mixed $subject, array $members): void
+    {
+        if (! $subject instanceof Jobs) {
+            throw self::wrongSubject('toDefine', 'larch()->jobs()', $subject);
+        }
+
+        self::assert(self::appRules()->define($subject, self::names('toDefine', 'a property or method name', $members)));
+    }
+
+    public static function toBeQueued(mixed $subject): void
+    {
+        if (! $subject instanceof Listeners) {
+            throw self::wrongSubject('toBeQueued', 'larch()->listenersOf(...)', $subject);
+        }
+
+        self::assert(self::appRules()->beQueued($subject));
+    }
+
+    public static function toBeInMorphMap(mixed $subject): void
+    {
+        if (! $subject instanceof Models) {
+            throw self::wrongSubject('toBeInMorphMap', 'larch()->models()', $subject);
+        }
+
+        self::assert(self::appRules()->beInMorphMap($subject));
+    }
+
+    /**
+     * @param  list<mixed>  $names
+     * @return list<string>
+     */
+    private static function names(string $expectation, string $what, array $names): array
+    {
+        if ($names === []) {
+            throw new LarchException("{$expectation}() takes at least one name.");
+        }
+
+        $valid = [];
+
+        foreach ($names as $name) {
+            if (! is_string($name) || $name === '') {
+                throw new LarchException("{$expectation}() takes {$what}, got ".get_debug_type($name).'.');
+            }
+
+            $valid[] = $name;
+        }
+
+        return $valid;
+    }
+
+    private static function appRules(): AppRules
+    {
+        return new AppRules(Larch::instance());
+    }
+
+    /**
      * @param  list<EdgeKind>  $kinds
      */
     private static function rules(array $kinds): Rules
@@ -121,11 +206,15 @@ final class Expectations
 
     /**
      * Fail on the violations the baseline does not accept.
+     *
+     * @template T of Breach
+     *
+     * @param  Result<T>  $result
      */
     private static function assert(Result $result): void
     {
         $larch = Larch::instance();
-        $new = Baseline::check($larch->baselinePath(), $result->violations);
+        $new = Baseline::check($larch->baselinePath(), $result->breaches);
 
         if ($new === []) {
             expect(true)->toBeTrue();
@@ -134,7 +223,7 @@ final class Expectations
         }
 
         $message = $result->report($new);
-        $accepted = count($result->violations) - count($new);
+        $accepted = count($result->breaches) - count($new);
 
         if ($accepted > 0) {
             $message .= "\n\n".$accepted.' more '.($accepted === 1 ? 'violation is' : 'violations are').' in the baseline, '.basename($larch->baselinePath()).'.';

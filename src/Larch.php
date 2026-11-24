@@ -15,6 +15,10 @@ use Nwidart\Larch\Graph\Graph;
 use Nwidart\Larch\Graph\GraphBuilder;
 use Nwidart\Larch\Modules\ModuleLink;
 use Nwidart\Larch\Runtime\RuntimePass;
+use Nwidart\Larch\Subjects\Jobs;
+use Nwidart\Larch\Subjects\Listeners;
+use Nwidart\Larch\Subjects\Models;
+use Nwidart\Larch\Subjects\Routes;
 
 /**
  * The configuration of Larch for one test run, and the graph it builds.
@@ -281,11 +285,50 @@ final class Larch
     }
 
     /**
+     * The routes of the booted app.
+     */
+    public function routes(): Routes
+    {
+        return new Routes;
+    }
+
+    /**
+     * The Eloquent models the code declares.
+     */
+    public function models(): Models
+    {
+        return new Models;
+    }
+
+    /**
+     * The jobs the code declares: classes that use the Bus Dispatchable trait.
+     */
+    public function jobs(): Jobs
+    {
+        return new Jobs;
+    }
+
+    /**
+     * The listeners of the events that match the patterns:
+     * listenersOf('Modules\Billing\Events\*').
+     */
+    public function listenersOf(string ...$events): Listeners
+    {
+        if ($events === []) {
+            throw new LarchException("larch()->listenersOf() takes at least one event pattern, such as 'App\\Events\\*'.");
+        }
+
+        return new Listeners(array_values(array_map(fn (string $event): string => ltrim($event, '\\'), $events)));
+    }
+
+    /**
      * The app the runtime pass reads: the one a Laravel test case booted,
      * or else the app of bootstrap/app.php, booted here in the testing
      * environment.
+     *
+     * @internal
      */
-    private function application(): Container
+    public function application(): Container
     {
         if (! class_exists(Container::class)) {
             throw new LarchException('Larch reads facades, the container, events and jobs from a Laravel app, and Laravel is not installed. Use via(Edge::imports()).');

@@ -39,3 +39,42 @@ expect()->extend('toIgnoreEventsOf', function (mixed ...$modules): Expectation {
 
     return $this;
 });
+
+/*
+ * App rules: routes, models, jobs and listeners of the booted app.
+ */
+
+expect()->extend('toUseMiddleware', function (string ...$middleware): Expectation {
+    /** @var Expectation<mixed> $this */
+    Expectations::toUseMiddleware($this->value, array_values($middleware));
+
+    return $this;
+});
+
+expect()->extend('toHavePolicy', function (): Expectation {
+    /** @var Expectation<mixed> $this */
+    Expectations::toHavePolicy($this->value);
+
+    return $this;
+});
+
+expect()->extend('toDefine', function (string ...$members): Expectation {
+    /** @var Expectation<mixed> $this */
+    Expectations::toDefine($this->value, array_values($members));
+
+    return $this;
+});
+
+expect()->extend('toBeQueued', function (): Expectation {
+    /** @var Expectation<mixed> $this */
+    Expectations::toBeQueued($this->value);
+
+    return $this;
+});
+
+expect()->extend('toBeInMorphMap', function (): Expectation {
+    /** @var Expectation<mixed> $this */
+    Expectations::toBeInMorphMap($this->value);
+
+    return $this;
+});

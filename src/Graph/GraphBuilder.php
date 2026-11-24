@@ -44,6 +44,7 @@ final class GraphBuilder
         $edges = [];
         $calls = [];
         $bindings = [];
+        $morphs = [];
 
         foreach ($this->files($paths) as $file) {
             $relative = $this->relative($file);
@@ -63,14 +64,17 @@ final class GraphBuilder
                 $calls[] = new CallSite($call['type'], $call['from'], $call['target'], $call['expression'], $relative, $call['line']);
             }
 
+            $morphs += $collector->morphs;
+
             foreach ($collector->bindings as $key => $line) {
                 $bindings[$key] ??= $relative.':'.$line;
             }
         }
 
         ksort($classes);
+        ksort($morphs);
 
-        return new Graph($classes, $edges, $calls, $bindings, $lines);
+        return new Graph($classes, $edges, $calls, $bindings, $lines, array_keys($morphs));
     }
 
     private function parse(string $file, string $relative): ReferenceCollector

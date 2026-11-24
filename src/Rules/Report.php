@@ -42,6 +42,27 @@ final class Report
     }
 
     /**
+     * @param  list<Finding>  $findings
+     */
+    public static function findings(string $headline, string $noun, string $nouns, array $findings): string
+    {
+        $count = count($findings);
+        $lines = [$headline.' '.$count.' '.($count === 1 ? $noun.' breaks' : $nouns.' break').' it:', ''];
+
+        foreach ($findings as $finding) {
+            $lines[] = '  '.$finding->place;
+
+            foreach ($finding->lines as $line) {
+                $lines[] = '    '.$line;
+            }
+
+            $lines[] = '';
+        }
+
+        return rtrim(implode("\n", $lines));
+    }
+
+    /**
      * @param  list<list<string>>  $cycles  the modules of each cycle
      * @param  list<ModuleLink>  $links
      */
