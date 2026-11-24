@@ -1,0 +1,58 @@
+---
+title: Larch
+description: Architecture rules for Laravel apps, as a Pest plugin. Larch sees the links that facades, the container, events and jobs make.
+template: splash
+hero:
+  tagline: Architecture rules for Laravel apps, as a Pest plugin. Larch checks which module uses which, and points at the file and line of every link that breaks a rule.
+  actions:
+    - text: Get started
+      link: getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/nwidart/larch
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+```php
+arch('billing uses only shared, and the public API of catalog')
+    ->expect(module('Billing'))
+    ->toOnlyDependOn(module('Shared'), module('Catalog')->publicApi())
+    ->via(Edge::all());
+```
+
+```
+Module Billing may only depend on Shared, Catalog (public API). 1 link breaks it:
+
+  Modules/Billing/app/Actions/ChargeOrder.php:18
+    Modules\Billing\Actions\ChargeOrder uses Modules\Inventory\Internal\StockLedger
+    through the facade Modules\Shared\Facades\Stock, bound in Modules/Inventory/app/Providers/InventoryServiceProvider.php:13
+    Billing may not depend on Inventory.
+```
+
+<CardGrid>
+	<Card title="Sees what imports hide" icon="magnifier">
+		Facades, container keys, event listeners and dispatched jobs link modules without an import.
+		Larch reads them from the booted app.
+	</Card>
+	<Card title="Rules on the app, too" icon="approve-check">
+		Routes need their middleware, models need a policy, queued jobs set retry limits.
+	</Card>
+	<Card title="Adopt it today" icon="rocket">
+		A baseline accepts the violations an app already has, so CI fails only on new ones.
+	</Card>
+	<Card title="A map of your modules" icon="puzzle">
+		`php artisan larch:graph` exports every link between modules, as JSON or as an HTML report.
+	</Card>
+</CardGrid>
+
+## Where to go
+
+<CardGrid>
+	<LinkCard title="Getting started" description="Install Larch and write your first rule, step by step." href="getting-started/" />
+	<LinkCard title="Guides" description="Recipes for one goal each: boundaries, app rules, the baseline, CI." href="guides/define-modules/" />
+	<LinkCard title="Reference" description="Every function, rule, option and file format." href="reference/configuration/" />
+	<LinkCard title="Concepts" description="How Larch reads an app, and why it works the way it does." href="concepts/modules/" />
+</CardGrid>
