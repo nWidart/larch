@@ -1,5 +1,11 @@
 # Larch
 
+[![CI](https://github.com/nWidart/larch/actions/workflows/php.yml/badge.svg)](https://github.com/nWidart/larch/actions/workflows/php.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/nwidart/larch.svg)](https://packagist.org/packages/nwidart/larch)
+[![Total Downloads](https://img.shields.io/packagist/dt/nwidart/larch.svg)](https://packagist.org/packages/nwidart/larch)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/nwidart/larch/php.svg)](https://packagist.org/packages/nwidart/larch)
+[![License](https://img.shields.io/packagist/l/nwidart/larch.svg)](LICENSE.md)
+
 ![Larch: architecture rules for Laravel apps, as a Pest plugin](docs/public/social.png)
 
 Architecture rules for Laravel apps, as a Pest plugin. Larch checks which module uses which, and prints every link that breaks a rule with the file and line it comes from.
