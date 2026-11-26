@@ -66,6 +66,9 @@ Larch reads every PSR-4 folder of the project outside `vendor`. To read only som
 larch()->paths('app', 'Modules');
 ```
 
+With laravel-modules 11 and later, the PSR-4 folder of a module is `Modules/<Name>/app`, so the default leaves out its route files.
+Read `Modules` to check them too. A route file of a module belongs to the module whose folder holds it.
+
 Larch skips folders named `vendor`, `node_modules`, `tests` and `Tests` wherever they appear.
 To skip other folders, replace that list:
 

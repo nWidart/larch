@@ -24,6 +24,17 @@ Run it:
 
 The preset is one Pest test. A failure lists the breaks of each rule under its name.
 
+## Check route files
+
+Mortise counts the imports of every file of a module, route files included.
+With laravel-modules 11 and later, Larch reads `Modules/<Name>/app` by default and leaves the route files out. Read the whole module folders:
+
+```php title="tests/Pest.php"
+larch()->paths('app', 'Modules');
+```
+
+A route file breaks a rule under its path: `Modules/Audit/routes/web.php uses Modules\Billing\Http\Controllers\InvoiceController`.
+
 ## Change the rules
 
 Edit the rules in Mortise, or edit `mortise.json`:

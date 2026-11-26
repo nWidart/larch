@@ -40,3 +40,5 @@ final class References extends Base implements Contract
 }
 
 interface Second extends \Fixtures\Other\ParentInterface {}
+
+$beside = new \Fixtures\Other\Beside;

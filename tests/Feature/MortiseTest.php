@@ -109,10 +109,13 @@ it('reports the modules that break allowed-use, under its name', function () {
 
     expect($run['exit'])->toBe(1)
         ->and($run['output'])->toContain(<<<'TXT'
-              mortise.json, allowed-use:
-            Module Audit may only depend on no other module. 2 links break it:
-            TXT)
-        ->and($run['output'])->toContain('Audit may not depend on Billing.');
+            mortise.json, allowed-use:
+            Module Audit may only depend on no other module. 3 links break it:
+
+              Modules/Audit/routes/web.php:6
+                Modules/Audit/routes/web.php uses Modules\Billing\Http\Controllers\InvoiceController
+                Audit may not depend on Billing.
+            TXT);
 });
 
 it('keeps the baseline entries of each rule apart', function () {

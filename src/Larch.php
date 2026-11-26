@@ -57,6 +57,9 @@ final class Larch
     /** @var array<string, string>|null module name => namespace */
     private ?array $moduleMap = null;
 
+    /** @var array<string, string|false>|null folder => the one module of the classes under it, or false */
+    private ?array $folderModules = null;
+
     /** @var array<string, list<ModuleLink>> kinds => links */
     private array $links = [];
 
@@ -224,6 +227,50 @@ final class Larch
     }
 
     /**
+     * The module of a file, by its place: the nearest folder above it that
+     * holds a class Larch reads, when every class under that folder belongs
+     * to one module. Modules/Audit/routes/web.php belongs to Audit when the
+     * classes under Modules/Audit are those of Audit. As Mortise counts it.
+     */
+    private function moduleOfFile(string $file): ?string
+    {
+        $folders = $this->folderModules ??= $this->folderModules();
+
+        for ($folder = dirname($file); ! isset($folders[$folder]); $folder = $parent) {
+            $parent = dirname($folder);
+
+            if ($parent === $folder) {
+                return null;
+            }
+        }
+
+        return $folders[$folder] === false ? null : $folders[$folder];
+    }
+
+    /**
+     * @return array<string, string|false> each folder that holds a class, in it or below, => the one module of its classes, or false
+     */
+    private function folderModules(): array
+    {
+        $folders = [];
+
+        foreach ($this->graph()->classes as $class => $file) {
+            $module = $this->moduleOf($class) ?? false;
+
+            for ($folder = dirname($file); ; $folder = $parent) {
+                $folders[$folder] = ($folders[$folder] ?? $module) === $module ? $module : false;
+                $parent = dirname($folder);
+
+                if ($parent === $folder) {
+                    break;
+                }
+            }
+        }
+
+        return $folders;
+    }
+
+    /**
      * Whether the class is in one of the public namespaces of its module.
      * PHP namespaces ignore case, and so does this.
      *
@@ -254,7 +301,8 @@ final class Larch
 
     /**
      * Every pair of classes in two different modules where the first uses
-     * the second, one link per kind of edge, with the places it does.
+     * the second, one link per kind of edge, with the places it does. Code
+     * outside every class uses from its file, in the module of its folder.
      *
      * @param  list<EdgeKind>  $kinds  only edges of these kinds
      * @return list<ModuleLink>
@@ -272,7 +320,7 @@ final class Larch
         $grouped = [];
 
         foreach ($graph->edgesOf($kinds) as $edge) {
-            $fromModule = $this->moduleOf($edge->from);
+            $fromModule = $graph->has($edge->from) ? $this->moduleOf($edge->from) : $this->moduleOfFile($edge->file);
             $toModule = $this->moduleOf($edge->to);
 
             if ($fromModule === null || $toModule === null || $fromModule === $toModule) {
@@ -502,6 +550,7 @@ final class Larch
         $this->runtimeGraph = null;
         $this->runtimeApp = null;
         $this->moduleMap = null;
+        $this->folderModules = null;
         $this->links = [];
 
         return $this;

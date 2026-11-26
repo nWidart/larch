@@ -6,6 +6,11 @@
 
 - `arch()->preset()->mortise()` reads the third rule of `mortise.json`, `allowed-use`: each module with a list may use only the modules of its list. A module without a list is not checked. A name that is no module breaks nothing. The shared fixture app `tests/Fixtures/mortise/allowed-use` holds the result Mortise and Larch both expect, and each `expected.json` gains the member `allowed-use`.
 
+### Changed
+
+- Code outside a class links too, as Mortise counts it: route files, config files, a migration that returns an anonymous class, and code beside a class. The link comes from the file, named by its path relative to the project root, in the module whose folder holds it: `Modules/Audit/routes/web.php uses Modules\Billing\Http\Controllers\InvoiceController`. Failure messages, baseline entries and `larch:graph` name the file. Baseline entries of today keep matching, and the export format keeps version 1. A rule that passed can now fail on a route file: fix the link or run `--update-larch-baseline`. With laravel-modules 11 and later, add `larch()->paths('app', 'Modules')` to read the route files of each module.
+- Blade views, `*.blade.php`, are no longer read as PHP. Mortise skips them too.
+
 ### Fixed
 
 - An unused import of a namespace, such as `use Modules\Billing\Contracts;`, no longer links to a class of that name. Mortise leaves it out too.

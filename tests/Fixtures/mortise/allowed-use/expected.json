@@ -1,7 +1,9 @@
 {
     "no-circular-use": [],
-    "public-surface-only": [],
+    "public-surface-only": [
+        {"from": "Modules/Audit/routes/web.php", "to": "Modules\\Billing\\Http\\Controllers\\InvoiceController"}
+    ],
     "allowed-use": [
-        {"from": "Audit", "to": "Billing", "files": 2}
+        {"from": "Audit", "to": "Billing", "files": 3}
     ]
 }

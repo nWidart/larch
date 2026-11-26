@@ -9,11 +9,12 @@ use Nwidart\Larch\Graph\Edge;
 use Nwidart\Larch\Graph\EdgeKind;
 
 /**
- * A class in one module that uses a class in another in one way (one kind of
- * edge), with every place it does.
+ * A class (or a file, for code outside every class) in one module that uses
+ * a class in another in one way (one kind of edge), with every place it does.
  */
 final readonly class ModuleLink
 {
+    /** The class that uses, or the file, relative to the project root, for code outside every class. */
     public string $fromClass;
 
     public string $toClass;

@@ -59,6 +59,13 @@ it('groups the links between modules by pair of classes', function () {
     ]);
 });
 
+it('gives a file to no module when its folder holds the classes of several', function () {
+    $larch = shop()->paths('Modules', 'routes');
+
+    expect(array_column($larch->graph()->edges, 'from'))->toContain('routes/web.php')
+        ->and(array_column($larch->links(), 'fromClass'))->not->toContain('routes/web.php');
+});
+
 it('reads the PSR-4 folders of the project by default', function () {
     $graph = Larch::reset()->modules('Nwidart\*')->graph();
 

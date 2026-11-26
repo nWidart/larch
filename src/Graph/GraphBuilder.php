@@ -18,7 +18,8 @@ use SplFileInfo;
 
 /**
  * Reads the PHP files under a set of folders and builds the graph of links
- * between the classes they declare. Nothing is loaded or run.
+ * from the classes they declare, and from the files for code outside every
+ * class. Nothing is loaded or run.
  */
 final class GraphBuilder
 {
@@ -122,7 +123,7 @@ final class GraphBuilder
         // Names are resolved in a first pass, so the collector sees the
         // arguments of a call resolved when it enters the call.
         $ast = (new NodeTraverser(new NameResolver))->traverse($ast);
-        $collector = new ReferenceCollector($code);
+        $collector = new ReferenceCollector($code, $relative);
         (new NodeTraverser($collector))->traverse($ast);
 
         return $collector;
@@ -152,7 +153,8 @@ final class GraphBuilder
                 $directory,
                 fn (SplFileInfo $item): bool => $item->isDir()
                     ? ! in_array($item->getFilename(), $this->excludedFolders, true)
-                    : $item->getExtension() === 'php',
+                    // A Blade view is a template, not PHP. Mortise skips it too.
+                    : $item->getExtension() === 'php' && ! str_ends_with($item->getFilename(), '.blade.php'),
             );
 
             /** @var SplFileInfo $file */

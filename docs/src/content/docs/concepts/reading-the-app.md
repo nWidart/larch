@@ -4,12 +4,14 @@ description: The two passes that build the graph of links, why imports are not e
 ---
 
 Larch builds a graph: each class is a node, and each link from one class to another is an edge.
+Code outside a class, such as a route file, is a node too: the file, in the module whose folder holds it.
 Rules are checks on that graph. It is built in two passes.
 
 ## Pass one: the code
 
 Larch parses every PHP file it reads with `nikic/php-parser`, without running it.
 It records each class a file names: in types, `new`, static calls, `::class`, attributes, `extends` and `implements`.
+A name inside a class links from that class; a name outside every class links from the file.
 These are the `import` links.
 
 This is what import-based tools do too, such as Pest's own `arch()`, Deptrac and PHPat.

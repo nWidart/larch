@@ -22,7 +22,7 @@ Module Billing may only depend on Shared, Catalog (public API). 1 link breaks it
 |---|---|
 | Headline | What the rule asks, and how many links break it. |
 | Place | The file and line of the first place of the link, and the other lines in the same file. |
-| Sentence | The class that uses, the [verb of the kind](/larch/reference/link-kinds/), and the class it uses. |
+| Sentence | The class that uses (or the file, for [code outside a class](/larch/reference/link-kinds/#code-outside-a-class)), the [verb of the kind](/larch/reference/link-kinds/), and the class it uses. |
 | How | For a link that is not an import: the facade or container key it goes `through`, and where it is `bound in` or `registered in`. Left out for imports. |
 | Reason | Why this link breaks the rule. |
 

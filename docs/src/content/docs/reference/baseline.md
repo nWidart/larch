@@ -38,7 +38,7 @@ Default path: `larch-baseline.json` at the project root. Change it with [`larch(
 |---|---|
 | `version` | `1`. |
 | `tests` | Each test name, with the entries it accepts. A preset with several rules has entries per rule. |
-| `from` | The class that uses. For app rules: the route (methods and URI) or the class. |
+| `from` | The class that uses, or the file, relative to the project root, for [code outside a class](/larch/reference/link-kinds/#code-outside-a-class). For app rules: the route (methods and URI) or the class. |
 | `to` | The class it uses. For app rules: what is missing, such as the middleware, the members or the event, or empty. |
 | `kind` | A [link kind](/larch/reference/link-kinds/), or for app rules `middleware`, `policy`, `define`, `queued` or `morph-map`. |
 
