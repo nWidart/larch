@@ -11,8 +11,7 @@ use Nwidart\Larch\Modules\ModuleLink;
 
 /**
  * The graph of modules as data, for larch:graph --json and the HTML report.
- * Mortise reads it (P11). The format has a version; a change that breaks a
- * reader raises it.
+ * The format has a version; a change that breaks a reader raises it.
  */
 final readonly class GraphExport
 {

@@ -16,7 +16,11 @@ The preset is one Pest test. Each rule has its own part of the failure message a
 {
     "rules": {
         "no-circular-use": true,
-        "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] }
+        "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] },
+        "allowed-use": {
+            "enabled": true,
+            "modules": { "Audit": [], "History": ["Audit", "Billing"] }
+        }
     }
 }
 ```
@@ -26,11 +30,15 @@ The preset is one Pest test. Each rule has its own part of the failure message a
 | `rules.no-circular-use` | boolean | `true` | [`toHaveNoCycles()`](/larch/reference/module-rules/#tohavenocycles) on every module. |
 | `rules.public-surface-only.enabled` | boolean | `true` | [`toOnlyUsePublicApis()`](/larch/reference/module-rules/#toonlyusepublicapis) on every module. |
 | `rules.public-surface-only.folders` | list of strings | `["Contracts", "Events"]` | The public API of each module, for this rule. |
+| `rules.allowed-use.enabled` | boolean | `true` when `allowed-use` is there | [`toOnlyDependOn()`](/larch/reference/module-rules/#toonlydependon) on each module with a list. Without `allowed-use`, the rule is off. |
+| `rules.allowed-use.modules` | object of lists of strings | `{}` | For each module with a list, the modules it may use. |
 
 - A missing file, or a missing key, means the default.
 - A key that is there must hold a valid value. `null` is not one.
 - A folder matches the first namespace inside a module, in any case. A folder with a backslash, such as `Internal\Api`, matches no class.
 - The rules check imports only, as Mortise does. An import that no class of the file uses counts too.
+- Under `allowed-use`, a module with a list may use only the modules of its list. An empty list means no module. A module without a list is not checked.
+- A name under `allowed-use` that is no module of the app breaks nothing. Mortise warns on it; the preset does not, because a Pest test only passes or fails.
 
 The test stops when Larch cannot read the file, when the file is not valid JSON, or when a key holds a wrong value.
 A folder or a broken link at the path also stops it. Mortise uses the defaults then; Larch does not, so CI does not pass on rules nobody wrote.

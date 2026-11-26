@@ -3,5 +3,6 @@
     "public-surface-only": [
         {"from": "Modules\\Billing\\Actions\\ChargeOrder", "to": "Modules\\Catalog\\Pricing\\PriceEngine"},
         {"from": "Modules\\Checkout\\Actions\\RefundOrder", "to": "Modules\\Catalog\\Pricing\\PriceEngine"}
-    ]
+    ],
+    "allowed-use": null
 }

@@ -32,12 +32,24 @@ Edit the rules in Mortise, or edit `mortise.json`:
 {
     "rules": {
         "no-circular-use": true,
-        "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] }
+        "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] },
+        "allowed-use": {
+            "enabled": true,
+            "modules": { "Audit": [], "History": ["Audit", "Billing"] }
+        }
     }
 }
 ```
 
-Without the file, both rules are on, with the folders `Contracts` and `Events`.
+Without the file, `no-circular-use` and `public-surface-only` are on, with the folders `Contracts` and `Events`.
+
+## Limit which modules a module uses
+
+Give a module a list under `allowed-use`. The module may use only the modules of its list. An empty list means no module.
+A module without a list is not checked. Without `allowed-use`, or with `"enabled": false`, the rule is off.
+
+In the example above, Audit may use no module, and History may use Audit and Billing.
+To check the same lists on runtime links too, write [`toOnlyDependOn()`](/larch/reference/module-rules/#toonlydependon) with `via(Edge::all())` in a test of its own.
 
 ## Leave a module out
 

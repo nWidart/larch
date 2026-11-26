@@ -69,4 +69,10 @@ Each rule of [`mortise.json`](/larch/reference/mortise/) that fails has its own 
 mortise.json, no-circular-use:
 Modules use each other in 1 cycle:
 ...
+
+mortise.json, allowed-use:
+Module Audit may only depend on no other module. 2 links break it:
+...
 ```
+
+Under `allowed-use`, each module with a list that breaks it has its own headline, as with `toOnlyDependOn()`.

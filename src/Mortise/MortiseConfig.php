@@ -14,7 +14,8 @@ use stdClass;
  *     {
  *         "rules": {
  *             "no-circular-use": true,
- *             "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] }
+ *             "public-surface-only": { "enabled": true, "folders": ["Contracts", "Events"] },
+ *             "allowed-use": { "enabled": true, "modules": { "Audit": [], "History": ["Audit"] } }
  *         }
  *     }
  *
@@ -29,11 +30,13 @@ final readonly class MortiseConfig
 
     /**
      * @param  list<string>  $folders  for a module without a public surface: the folders other modules may use
+     * @param  array<string, list<string>>|null  $allowedUse  for each module with a list, the modules it may use; null when the rule is off or the key is missing
      */
     public function __construct(
         public bool $noCircularUse = true,
         public bool $publicSurfaceOnly = true,
         public array $folders = ['Contracts', 'Events'],
+        public ?array $allowedUse = null,
     ) {}
 
     public static function read(string $root): self
@@ -98,7 +101,47 @@ final readonly class MortiseConfig
         }
 
         /** @var list<string> $folders */
-        return new self($cycles, $enabled, $folders);
+        return new self($cycles, $enabled, $folders, self::allowedUse($path, $rules));
+    }
+
+    /**
+     * @return array<string, list<string>>|null
+     */
+    private static function allowedUse(string $path, stdClass $rules): ?array
+    {
+        if (! property_exists($rules, 'allowed-use')) {
+            return null;
+        }
+
+        $allowed = $rules->{'allowed-use'};
+
+        if (! $allowed instanceof stdClass) {
+            throw self::invalid($path, '"allowed-use" is not an object');
+        }
+
+        $enabled = property_exists($allowed, 'enabled') ? $allowed->enabled : true;
+        $modules = property_exists($allowed, 'modules') ? $allowed->modules : new stdClass;
+
+        if (! is_bool($enabled)) {
+            throw self::invalid($path, '"allowed-use.enabled" is not true or false');
+        }
+
+        if (! $modules instanceof stdClass) {
+            throw self::invalid($path, '"allowed-use.modules" is not an object');
+        }
+
+        $lists = [];
+
+        foreach (get_object_vars($modules) as $module => $list) {
+            if (! is_array($list) || array_filter($list, fn (mixed $name): bool => ! is_string($name)) !== []) {
+                throw self::invalid($path, "\"allowed-use.modules.{$module}\" is not a list of module names");
+            }
+
+            /** @var list<string> $list */
+            $lists[(string) $module] = $list;
+        }
+
+        return $enabled ? $lists : null;
     }
 
     private static function invalid(string $path, string $why): LarchException

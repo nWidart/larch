@@ -9,6 +9,7 @@ use Nwidart\Larch\Larch;
 use Nwidart\Larch\Rules\Result;
 use Nwidart\Larch\Rules\Rules;
 use Nwidart\Larch\Rules\Violation;
+use Nwidart\Larch\Subjects\Module;
 
 /**
  * The rules of mortise.json, checked on imports as Mortise checks them
@@ -19,6 +20,9 @@ use Nwidart\Larch\Rules\Violation;
  * - A folder of the public surface is matched against the first segment of
  *   the namespace inside the module, in any case. A folder with a
  *   backslash, such as Internal\Api, matches no class.
+ * - Under allowed-use, a module with a list uses only the modules of its
+ *   list; a module without a list is not checked. A name that is no module
+ *   of the app breaks nothing. Mortise warns on it; a Pest test cannot.
  */
 final readonly class MortisePreset
 {
@@ -35,12 +39,13 @@ final readonly class MortisePreset
     {
         $config = MortiseConfig::read($this->larch->projectRoot());
 
-        if (! $config->noCircularUse && ! $config->publicSurfaceOnly) {
+        if (! $config->noCircularUse && ! $config->publicSurfaceOnly && $config->allowedUse === null) {
             return [];
         }
 
         $off = $this->modulesOff();
-        $modules = array_values(array_diff(array_keys($this->larch->moduleMap()), $off));
+        $all = array_keys($this->larch->moduleMap());
+        $modules = array_values(array_diff($all, $off));
         $folders = array_values(array_filter($config->folders, fn (string $folder): bool => ! str_contains($folder, '\\')));
         $rules = new Rules($this->larch, [EdgeKind::Import], $folders, $off);
         $results = [];
@@ -53,7 +58,43 @@ final readonly class MortisePreset
             $results['public-surface-only'] = $rules->onlyUsePublicApis($modules);
         }
 
+        if ($config->allowedUse !== null) {
+            $results['allowed-use'] = $this->allowedUse($rules, $config->allowedUse, $all);
+        }
+
         return $results;
+    }
+
+    /**
+     * toOnlyDependOn() for each module with a list, as one rule. A name
+     * that is no module is left out, so it breaks nothing.
+     *
+     * @param  array<string, list<string>>  $lists
+     * @param  list<string>  $all  the modules of the app, on or off
+     * @return Result<Violation>
+     */
+    private function allowedUse(Rules $rules, array $lists, array $all): Result
+    {
+        $results = [];
+
+        foreach ($lists as $module => $list) {
+            if (in_array($module, $all, true)) {
+                $targets = array_map(fn (string $name): Module => new Module($name), array_values(array_intersect($list, $all)));
+                $results[] = $rules->onlyDependOn(new Module($module), $targets);
+            }
+        }
+
+        $breaches = array_merge(...array_map(fn (Result $result): array => $result->breaches, $results));
+
+        // The message of each module, for the breaks the baseline does not accept.
+        return new Result($breaches, fn (array $new): string => implode("\n\n", array_filter(array_map(
+            function (Result $result) use ($new): string {
+                $part = array_values(array_filter($result->breaches, fn (Violation $violation): bool => in_array($violation, $new, true)));
+
+                return $part === [] ? '' : $result->report($part);
+            },
+            $results,
+        ))));
     }
 
     /**

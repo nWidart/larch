@@ -27,7 +27,7 @@ php artisan larch:graph --html --output=build/graph.html
 php artisan larch:graph --json > graph.json
 ```
 
-JSON is the default, so `--json` is optional. Mortise reads this format.
+JSON is the default, so `--json` is optional.
 The fields are in the [graph format reference](/larch/reference/graph-command/#json-format).
 
 ## Pass your configuration
