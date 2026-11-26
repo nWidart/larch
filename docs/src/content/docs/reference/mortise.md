@@ -50,8 +50,9 @@ Larch reads `modules_statuses.json` at the project root, the file of laravel-mod
 It reads the file as laravel-modules does:
 
 - A module is on only when its entry is `true`. A module without an entry is off, and so is every module of an app without the file.
+- The name of a module is the `name` in its `module.json`, as laravel-modules boots it, else the folder of that `module.json`. A module without a `module.json` keeps the name Larch gives it.
 - The entry of a module is the key of its name, else the first key that matches the name in any case.
-- An empty file holds no entries. A file that is not a JSON object of module names stops the test.
+- An empty file, or one of JSON whitespace only, holds no entries. A file that is not a JSON object of module names stops the test.
 
 A module that is off breaks no rule, and no link to it does. Cycles are found among the modules that are on.
 

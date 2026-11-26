@@ -7,7 +7,7 @@ The preset turns a module off only when its entry in `modules_statuses.json` is 
 ## What Changes
 
 - **BREAKING (results):** a module is on only when its entry is `true`. A module without an entry is off, and so is every module of an app without the file. Such an app now gets no break from those modules.
-- An entry matches its module as in laravel-modules: the key of its name, else the first key that matches the name in any case.
+- An entry matches its module as in laravel-modules: by the `name` in the module's `module.json`, the key of that name, else the first key that matches it in any case.
 - An empty file holds no entries. A file that is not a JSON object of module names stops the test, as laravel-modules refuses to boot with it. Before, Larch ignored it.
 - The shared fixture apps `defaults`, `custom-folders` and `all-off` gain a `modules_statuses.json` that turns every module on, so each `expected.json` keeps its result. In `module-off`, Shipping has no entry instead of `false`.
 - Docs: the preset reference and the Mortise guide say how the file is read.

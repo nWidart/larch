@@ -157,8 +157,9 @@ describe('modules_statuses.json', function () {
     });
 
     /**
-     * Whether the preset finds the cycle of Checkout and Shipping in the
-     * code of the app defaults, with the given statuses file or none.
+     * Whether the preset finds the cycle of Checkout and Shipping in the app
+     * tests/Fixtures/statuses, with the given statuses file or none. The
+     * module.json of Checkout names it StoreCheckout.
      */
     function findsCycleWith(string $app, ?string $statuses): bool
     {
@@ -166,7 +167,7 @@ describe('modules_statuses.json', function () {
             file_put_contents($app.'/modules_statuses.json', $statuses);
         }
 
-        $larch = Larch::reset()->root($app)->paths((string) realpath(__DIR__.'/../Fixtures/mortise/defaults/Modules'))->modules('Modules\*');
+        $larch = Larch::reset()->root($app)->paths((string) realpath(__DIR__.'/../Fixtures/statuses/Modules'))->modules('Modules\*');
 
         return (new MortisePreset($larch))->results()['no-circular-use']->breaches !== [];
     }
@@ -174,9 +175,11 @@ describe('modules_statuses.json', function () {
     it('matches the entry of a module as laravel-modules does', function (?string $statuses, bool $on) {
         expect(findsCycleWith($this->app, $statuses))->toBe($on);
     })->with([
-        'another case' => ['{"checkout": true, "SHIPPING": true}', true],
-        'the exact name before another case' => ['{"Checkout": true, "shipping": false, "Shipping": true}', true],
-        'a value other than true' => ['{"Checkout": true, "Shipping": 1}', false],
+        'the name in module.json' => ['{"StoreCheckout": true, "Shipping": true}', true],
+        'the name of the namespace' => ['{"Checkout": true, "Shipping": true}', false],
+        'another case' => ['{"storecheckout": true, "SHIPPING": true}', true],
+        'the exact name before another case' => ['{"StoreCheckout": true, "shipping": false, "Shipping": true}', true],
+        'a value other than true' => ['{"StoreCheckout": true, "Shipping": 1}', false],
         'no file' => [null, false],
         'an empty file' => ['', false],
         'an empty list' => ['[]', false],
@@ -184,7 +187,7 @@ describe('modules_statuses.json', function () {
 
     it('stops on a file laravel-modules does not boot with', function (string $statuses) {
         expect(fn () => findsCycleWith($this->app, $statuses))->toThrow(LarchException::class, 'modules_statuses.json is not valid');
-    })->with(['{', '[true]', '"on"']);
+    })->with(['{', '[true]', '"on"', 'NUL bytes' => "\0\0"]);
 });
 
 describe('mortise.json', function () {

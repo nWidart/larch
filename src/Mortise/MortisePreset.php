@@ -111,15 +111,20 @@ final readonly class MortisePreset
     private function modulesOff(): array
     {
         $statuses = $this->statuses();
+        $names = $this->activationNames();
         $off = [];
 
         foreach (array_keys($this->larch->moduleMap()) as $module) {
             $module = (string) $module;
-            $key = array_key_exists($module, $statuses) ? $module : null;
+            $name = $names[$module] ?? $module;
+            $key = array_key_exists($name, $statuses) ? $name : null;
 
-            foreach (array_keys($statuses) as $stored) {
-                if ($key === null && strtolower((string) $stored) === strtolower($module)) {
-                    $key = $stored;
+            if ($key === null) {
+                foreach (array_keys($statuses) as $stored) {
+                    if (strtolower((string) $stored) === strtolower($name)) {
+                        $key = $stored;
+                        break;
+                    }
                 }
             }
 
@@ -129,6 +134,42 @@ final readonly class MortisePreset
         }
 
         return $off;
+    }
+
+    /**
+     * The name laravel-modules boots each module under, by Larch's name of
+     * it: the name in the module.json nearest above a file of the module,
+     * else the folder of that module.json. Mortise names a module the same
+     * way. A module without a module.json keeps Larch's name.
+     *
+     * @return array<string, string>
+     */
+    private function activationNames(): array
+    {
+        $root = $this->larch->projectRoot();
+        $names = [];
+
+        foreach ($this->larch->graph()->classes as $class => $file) {
+            $module = $this->larch->moduleOf($class);
+
+            if ($module === null || array_key_exists($module, $names)) {
+                continue;
+            }
+
+            $names[$module] = null;
+
+            for ($folder = dirname($file); $folder !== '.' && $folder !== dirname($folder); $folder = dirname($folder)) {
+                $manifest = (str_starts_with($folder, '/') ? $folder : $root.'/'.$folder).'/module.json';
+
+                if (is_file($manifest)) {
+                    $json = json_decode((string) file_get_contents($manifest), true);
+                    $names[$module] = is_array($json) && is_string($json['name'] ?? null) ? $json['name'] : basename($folder);
+                    break;
+                }
+            }
+        }
+
+        return array_filter($names, 'is_string');
     }
 
     /**
@@ -152,7 +193,8 @@ final readonly class MortisePreset
             throw new LarchException("Larch could not read {$path}.");
         }
 
-        if (trim($contents) === '') {
+        // JSON whitespace only: a file of NUL bytes is corrupt, not empty.
+        if (trim($contents, " \t\r\n") === '') {
             return [];
         }
 
