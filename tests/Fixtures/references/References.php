@@ -8,6 +8,7 @@ use Fixtures\Other\Contract;
 use Fixtures\Other\Thrown;
 use Fixtures\Other\Trait_;
 use Fixtures\Other\Unused;
+use Fixtures\References as Here;
 
 #[Attribute]
 final class References extends Base implements Contract

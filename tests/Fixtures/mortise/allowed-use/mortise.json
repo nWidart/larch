@@ -1,0 +1,12 @@
+{
+    "rules": {
+        "allowed-use": {
+            "enabled": true,
+            "modules": {
+                "Audit": [],
+                "History": ["Audit", "Billing", "Reports"],
+                "Legacy": []
+            }
+        }
+    }
+}

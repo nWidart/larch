@@ -3,5 +3,6 @@
     "public-surface-only": [
         {"from": "Modules\\Billing\\Listeners\\ReprintInvoice", "to": "Modules\\Catalog\\Events\\PriceChanged"},
         {"from": "Modules\\Billing\\Listeners\\ReprintInvoice", "to": "Modules\\Shared\\Support\\Clock"}
-    ]
+    ],
+    "allowed-use": null
 }

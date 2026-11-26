@@ -1,0 +1,7 @@
+{
+    "no-circular-use": [],
+    "public-surface-only": [],
+    "allowed-use": [
+        {"from": "Audit", "to": "Billing", "files": 2}
+    ]
+}

@@ -20,7 +20,7 @@ function mortiseApp(string $app): Larch
 /**
  * What Larch finds in a shared fixture app, in the form of expected.json.
  *
- * @return array{no-circular-use: list<list<string>>|null, public-surface-only: list<array{from: string, to: string}>|null}
+ * @return array{no-circular-use: list<list<string>>|null, public-surface-only: list<array{from: string, to: string}>|null, allowed-use: list<array{from: string, to: string, files: int}>|null}
  */
 function mortiseResult(string $app): array
 {
@@ -46,14 +46,36 @@ function mortiseResult(string $app): array
         ), SORT_REGULAR));
     }
 
-    return ['no-circular-use' => $cycles, 'public-surface-only' => $links];
+    $uses = null;
+
+    if (isset($results['allowed-use'])) {
+        $files = [];
+
+        foreach ($results['allowed-use']->breaches as $violation) {
+            foreach ($violation->link->edges as $edge) {
+                $files[$violation->link->fromModule][$violation->link->toModule][$edge->file] = true;
+            }
+        }
+
+        $uses = [];
+
+        foreach ($files as $from => $to) {
+            foreach ($to as $module => $paths) {
+                $uses[] = ['from' => $from, 'to' => $module, 'files' => count($paths)];
+            }
+        }
+
+        usort($uses, fn (array $a, array $b): int => [$a['from'], $a['to']] <=> [$b['from'], $b['to']]);
+    }
+
+    return ['no-circular-use' => $cycles, 'public-surface-only' => $links, 'allowed-use' => $uses];
 }
 
 it('agrees with the expected result of each shared fixture app', function (string $app) {
     $expected = json_decode((string) file_get_contents(__DIR__."/../Fixtures/mortise/{$app}/expected.json"), true);
 
     expect(mortiseResult($app))->toBe($expected);
-})->with(['defaults', 'custom-folders', 'all-off', 'module-off']);
+})->with(['defaults', 'custom-folders', 'all-off', 'module-off', 'allowed-use']);
 
 it('runs the rules of mortise.json through the preset, in one test', function () {
     $run = runPest('tests/Fixtures/preset/MortiseTest.php', ['LARCH_APP' => realpath(__DIR__.'/../Fixtures/mortise/defaults')]);
@@ -80,6 +102,17 @@ it('runs the rules of mortise.json through the preset, in one test', function ()
                 Modules\Billing\Models\Invoice uses Modules\Shared\Money\Money
                 It is internal to Shared. The public API of a module is: Contracts, Events.
             TXT);
+});
+
+it('reports the modules that break allowed-use, under its name', function () {
+    $run = runPest('tests/Fixtures/preset/MortiseTest.php', ['LARCH_APP' => realpath(__DIR__.'/../Fixtures/mortise/allowed-use')]);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['output'])->toContain(<<<'TXT'
+              mortise.json, allowed-use:
+            Module Audit may only depend on no other module. 2 links break it:
+            TXT)
+        ->and($run['output'])->toContain('Audit may not depend on Billing.');
 });
 
 it('keeps the baseline entries of each rule apart', function () {
@@ -131,12 +164,13 @@ describe('mortise.json', function () {
         'no rules' => '{"team": "shop"}',
         'empty rules' => '{"rules": {}}',
         'empty surface' => '{"rules": {"public-surface-only": {}}}',
+        'allowed use off' => '{"rules": {"allowed-use": {"enabled": false, "modules": {"Audit": []}}}}',
     ]);
 
     it('reads each key', function () {
-        file_put_contents($this->app.'/mortise.json', '{"rules": {"no-circular-use": false, "public-surface-only": {"enabled": false, "folders": ["Api"]}}}');
+        file_put_contents($this->app.'/mortise.json', '{"rules": {"no-circular-use": false, "public-surface-only": {"enabled": false, "folders": ["Api"]}, "allowed-use": {"modules": {"Audit": [], "History": ["Audit"]}}}}');
 
-        expect(MortiseConfig::read($this->app))->toEqual(new MortiseConfig(false, false, ['Api']));
+        expect(MortiseConfig::read($this->app))->toEqual(new MortiseConfig(false, false, ['Api'], ['Audit' => [], 'History' => ['Audit']]));
     });
 
     it('stops on a file that does not hold rules', function (string $json, string $why) {
@@ -154,6 +188,10 @@ describe('mortise.json', function () {
         ['{"rules": null}', '"rules" is not an object'],
         ['{"rules": {"no-circular-use": null}}', '"no-circular-use" is not true or false'],
         ['{"rules": {"public-surface-only": {"folders": {"0": "Pricing"}}}}', '"public-surface-only.folders" is not a list of folder names'],
+        ['{"rules": {"allowed-use": [true]}}', '"allowed-use" is not an object'],
+        ['{"rules": {"allowed-use": {"enabled": "yes"}}}', '"allowed-use.enabled" is not true or false'],
+        ['{"rules": {"allowed-use": {"modules": ["Audit"]}}}', '"allowed-use.modules" is not an object'],
+        ['{"rules": {"allowed-use": {"modules": {"Audit": "Billing"}}}}', '"allowed-use.modules.Audit" is not a list of module names'],
     ]);
 
     it('stops on a path it cannot read as a file', function () {

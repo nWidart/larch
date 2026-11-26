@@ -55,12 +55,12 @@ it('records each declared class with its file, and each link with its line', fun
 
     $created = array_values(array_filter($graph->edges, fn (Edge $edge): bool => $edge->to === 'Fixtures\Other\Created'))[0];
 
-    expect($created->line)->toBe(19)
+    expect($created->line)->toBe(20)
         ->and($created->kind)->toBe(EdgeKind::Import)
         ->and($created->file)->toBe('references/References.php');
 });
 
-it('links an interface to the interface it extends, and each class of a file to an import none uses', function () {
+it('links an interface to the interface it extends, and each class of a file to an import none uses, unless it names a namespace', function () {
     expect(referencesOf('Fixtures\References\Second'))->toBe(['Fixtures\Other\ParentInterface', 'Fixtures\Other\Unused']);
 });
 

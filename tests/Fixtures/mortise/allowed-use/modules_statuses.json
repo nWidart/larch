@@ -1,0 +1,7 @@
+{
+    "Audit": true,
+    "Billing": true,
+    "History": true,
+    "Ingest": true,
+    "Legacy": false
+}

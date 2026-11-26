@@ -279,9 +279,9 @@ final class Larch
                 continue;
             }
 
-            $key = $edge->from.'|'.$edge->to."\0".$edge->kind->value;
-            $grouped[$key] ??= ['from' => $fromModule, 'to' => $toModule, 'edges' => []];
-            $grouped[$key]['edges'][] = $edge;
+            $link = $edge->from.'|'.$edge->to."\0".$edge->kind->value;
+            $grouped[$link] ??= ['from' => $fromModule, 'to' => $toModule, 'edges' => []];
+            $grouped[$link]['edges'][] = $edge;
         }
 
         ksort($grouped);

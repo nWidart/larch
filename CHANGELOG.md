@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `arch()->preset()->mortise()` reads the third rule of `mortise.json`, `allowed-use`: each module with a list may use only the modules of its list. A module without a list is not checked. A name that is no module breaks nothing. The shared fixture app `tests/Fixtures/mortise/allowed-use` holds the result Mortise and Larch both expect, and each `expected.json` gains the member `allowed-use`.
+
+### Fixed
+
+- An unused import of a namespace, such as `use Modules\Billing\Contracts;`, no longer links to a class of that name. Mortise leaves it out too.
+- `Larch::links()` reuses the links it found for the same kinds, so the preset no longer builds them again for each module with a list.
+- The graph export guide no longer says that Mortise reads the JSON format. It does not.
+
 ## 0.1.0 - 2026-11-24
 
 ### Added
