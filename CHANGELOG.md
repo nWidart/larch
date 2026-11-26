@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `arch()->preset()->mortise()` reads `modules_statuses.json` as laravel-modules and Mortise do: a module is on only when its entry is `true`. A module without an entry is now off, and so is every module of an app without the file. Before, Larch counted them on. **This changes results:** an app without `modules_statuses.json`, or with modules it does not list, now gets no break from those modules, and no link to them breaks a rule. Add the file with each module set to `true` to keep checking them. An entry matches the name in the module's `module.json`, in any case, as in laravel-modules. A file that is not a JSON object of module names now stops the test, so CI does not pass with every module off.
+- The shared fixture apps `defaults`, `custom-folders` and `all-off` gain a `modules_statuses.json` that turns every module on, so their `expected.json` holds for both readings. In `module-off`, Shipping has no entry instead of `false`.
+
 ## 0.2.0 - 2026-11-26
 
 ### Added

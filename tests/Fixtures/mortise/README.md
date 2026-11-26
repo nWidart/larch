@@ -7,7 +7,7 @@ Each folder is an app with laravel-modules' layout:
 - `Modules/<Name>/module.json` and `Modules/<Name>/app/...`, namespace `Modules\<Name>\...`.
 - `Modules/<Name>/routes/...`, files that declare no class. Each belongs to the module whose folder holds it.
 - `mortise.json`, when the app has one. Without it, the defaults apply: `no-circular-use` and `public-surface-only` on, public folders `Contracts` and `Events`, `allowed-use` off.
-- `modules_statuses.json`, when the app turns modules off. A module that is off breaks no rule, and no link to it does.
+- `modules_statuses.json`, the file of laravel-modules' file activator. A module is on only when its entry is `true`: a module without an entry is off, and so is every module of an app without the file. A module that is off breaks no rule, and no link to it does. Each app has the file, so it says which modules are on.
 - `expected.json`, the result on imports:
 
 ```json
@@ -30,6 +30,6 @@ Each folder is an app with laravel-modules' layout:
 |---|---|
 | `defaults` | No `mortise.json`. A cycle between Checkout and Shipping through public classes. Two links to internal classes. |
 | `custom-folders` | Other keys in the file are kept. `no-circular-use` is off while Billing and Catalog use each other. The folders are `contracts`, in lower case, and `Money`. |
-| `all-off` | The code of `defaults`, with both rules off. |
+| `all-off` | The code of `defaults`, with both rules off and every module on. |
 | `allowed-use` | Modelled on Mortise's `fixtures/layered`. Audit has an empty list and uses Billing in 3 files: the one break. One of the 3 is `Modules/Audit/routes/web.php`, which declares no class and registers a route with `InvoiceController`, an internal class of Billing: the one break of `public-surface-only`. History may use Audit, Billing and Reports, which is no module, and also uses Legacy, which is off. Ingest has no list. Legacy is off, with an empty list, and uses Billing. |
-| `module-off` | The code of `defaults`, with Shared and Shipping off: no cycle, and Billing may use Shared. Checkout imports an internal class of Catalog and never uses it. |
+| `module-off` | The code of `defaults`, with Shared and Shipping off: no cycle, and Billing may use Shared. Shared is `false`; Shipping has no entry. Checkout imports an internal class of Catalog and never uses it. |

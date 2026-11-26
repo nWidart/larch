@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nwidart\Larch\Mortise;
 
+use Nwidart\Larch\Exceptions\LarchException;
 use Nwidart\Larch\Graph\EdgeKind;
 use Nwidart\Larch\Larch;
 use Nwidart\Larch\Rules\Result;
@@ -15,8 +16,8 @@ use Nwidart\Larch\Subjects\Module;
  * The rules of mortise.json, checked on imports as Mortise checks them
  * (mortise-core, boundary/links.rs and rules.rs):
  *
- * - A module that modules_statuses.json turns off breaks no rule, and no
- *   link to it does. Cycles are found among the modules that are on.
+ * - A module that modules_statuses.json does not turn on breaks no rule,
+ *   and no link to it does. Cycles are found among the modules that are on.
  * - A folder of the public surface is matched against the first segment of
  *   the namespace inside the module, in any case. A folder with a
  *   backslash, such as Internal\Api, matches no class.
@@ -98,22 +99,112 @@ final readonly class MortisePreset
     }
 
     /**
-     * The modules modules_statuses.json at the project root turns off.
-     * Mortise reads the file laravel-modules' file activator keeps; Larch
-     * reads it at its default path.
+     * The modules that modules_statuses.json at the project root does not
+     * turn on. Mortise reads the file laravel-modules' file activator keeps;
+     * Larch reads it at its default path. As in the activator, a module is
+     * on only when its entry is true. A module without an entry is off, and
+     * so is every module of an app without the file. The entry of a module
+     * is the key of its name, else the first key that matches it in any case.
      *
      * @return list<string>
      */
     private function modulesOff(): array
     {
-        $path = $this->larch->projectRoot().'/'.self::STATUSES_FILE;
-        $contents = is_file($path) ? file_get_contents($path) : false;
-        $statuses = $contents === false ? null : json_decode($contents, true);
+        $statuses = $this->statuses();
+        $names = $this->activationNames();
+        $off = [];
 
-        if (! is_array($statuses)) {
+        foreach (array_keys($this->larch->moduleMap()) as $module) {
+            $module = (string) $module;
+            $name = $names[$module] ?? $module;
+            $key = array_key_exists($name, $statuses) ? $name : null;
+
+            if ($key === null) {
+                foreach (array_keys($statuses) as $stored) {
+                    if (strtolower((string) $stored) === strtolower($name)) {
+                        $key = $stored;
+                        break;
+                    }
+                }
+            }
+
+            if ($key === null || $statuses[$key] !== true) {
+                $off[] = $module;
+            }
+        }
+
+        return $off;
+    }
+
+    /**
+     * The name laravel-modules boots each module under, by Larch's name of
+     * it: the name in the module.json nearest above a file of the module,
+     * else the folder of that module.json. Mortise names a module the same
+     * way. A module without a module.json keeps Larch's name.
+     *
+     * @return array<string, string>
+     */
+    private function activationNames(): array
+    {
+        $root = $this->larch->projectRoot();
+        $names = [];
+
+        foreach ($this->larch->graph()->classes as $class => $file) {
+            $module = $this->larch->moduleOf($class);
+
+            if ($module === null || array_key_exists($module, $names)) {
+                continue;
+            }
+
+            $names[$module] = null;
+
+            for ($folder = dirname($file); $folder !== '.' && $folder !== dirname($folder); $folder = dirname($folder)) {
+                $manifest = (str_starts_with($folder, '/') ? $folder : $root.'/'.$folder).'/module.json';
+
+                if (is_file($manifest)) {
+                    $json = json_decode((string) file_get_contents($manifest), true);
+                    $names[$module] = is_array($json) && is_string($json['name'] ?? null) ? $json['name'] : basename($folder);
+                    break;
+                }
+            }
+        }
+
+        return array_filter($names, 'is_string');
+    }
+
+    /**
+     * The entries of modules_statuses.json, by module name. A missing or
+     * empty file holds none. A file laravel-modules would not boot with
+     * stops the test, so CI does not pass with every module off.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function statuses(): array
+    {
+        $path = $this->larch->projectRoot().'/'.self::STATUSES_FILE;
+
+        if (! file_exists($path) && ! is_link($path)) {
             return [];
         }
 
-        return array_map('strval', array_keys(array_filter($statuses, fn (mixed $on): bool => $on === false)));
+        $contents = is_file($path) ? file_get_contents($path) : false;
+
+        if ($contents === false) {
+            throw new LarchException("Larch could not read {$path}.");
+        }
+
+        // JSON whitespace only: a file of NUL bytes is corrupt, not empty.
+        if (trim($contents, " \t\r\n") === '') {
+            return [];
+        }
+
+        $statuses = json_decode($contents, true);
+
+        // An empty list ([]) holds no entries; any other list names no module.
+        if (! is_array($statuses) || ($statuses !== [] && array_is_list($statuses))) {
+            throw new LarchException("{$path} is not valid: laravel-modules expects a JSON object of module names to true or false.");
+        }
+
+        return $statuses;
     }
 }

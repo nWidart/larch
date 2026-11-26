@@ -2,6 +2,5 @@
     "Billing": true,
     "Catalog": true,
     "Checkout": true,
-    "Shared": false,
-    "Shipping": false
+    "Shared": false
 }
