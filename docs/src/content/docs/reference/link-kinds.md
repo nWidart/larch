@@ -30,6 +30,8 @@ A class named in:
 - `extends` and `implements`.
 
 An import that no class of the file uses links each class of the file to the imported class.
+An import of a namespace that holds classes, such as `use Modules\Billing\Contracts;`, links nothing by itself. A class used through it, such as `Contracts\Ledger`, is linked.
+Code outside a class, such as a route file, links nothing.
 
 ## `facade`
 

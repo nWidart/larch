@@ -74,7 +74,35 @@ final class GraphBuilder
         ksort($classes);
         ksort($morphs);
 
-        return new Graph($classes, $edges, $calls, $bindings, $lines, array_keys($morphs));
+        return new Graph($classes, self::withoutNamespaces($edges, $classes), $calls, $bindings, $lines, array_keys($morphs));
+    }
+
+    /**
+     * Leaves out the links to a namespace, such as an unused
+     * use Modules\Billing\Contracts;: the code declares no class of that
+     * name, but declares classes inside it. Mortise leaves them out too.
+     *
+     * @param  list<Edge>  $edges
+     * @param  array<string, string>  $classes
+     * @return list<Edge>
+     */
+    private static function withoutNamespaces(array $edges, array $classes): array
+    {
+        $namespaces = [];
+
+        foreach (array_keys($classes) as $class) {
+            $parts = explode('\\', $class);
+
+            while (count($parts) > 1) {
+                array_pop($parts);
+                $namespaces[implode('\\', $parts)] = true;
+            }
+        }
+
+        return array_values(array_filter(
+            $edges,
+            fn (Edge $edge): bool => isset($classes[$edge->to]) || ! isset($namespaces[$edge->to]),
+        ));
     }
 
     private function parse(string $file, string $relative): ReferenceCollector

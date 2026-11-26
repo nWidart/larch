@@ -36,7 +36,8 @@ The preset is one Pest test. Each rule has its own part of the failure message a
 - A missing file, or a missing key, means the default.
 - A key that is there must hold a valid value. `null` is not one.
 - A folder matches the first namespace inside a module, in any case. A folder with a backslash, such as `Internal\Api`, matches no class.
-- The rules check imports only, as Mortise does. An import that no class of the file uses counts too.
+- The rules check imports only, as Mortise does. An import that no class of the file uses counts too. An import of a namespace, such as `use Modules\Billing\Contracts;`, counts only where the code uses a class through it.
+- Larch reads links from classes. An import in a file that declares no class, such as a route file, links nothing in Larch. Mortise counts it for the module that holds the file.
 - Under `allowed-use`, a module with a list may use only the modules of its list. An empty list means no module. A module without a list is not checked.
 - A name under `allowed-use` that is no module of the app breaks nothing. Mortise warns on it; the preset does not, because a Pest test only passes or fails.
 
