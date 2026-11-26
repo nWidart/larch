@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-11-26
 
 ### Added
 
@@ -16,6 +16,7 @@
 - An unused import of a namespace, such as `use Modules\Billing\Contracts;`, no longer links to a class of that name. Mortise leaves it out too.
 - `Larch::links()` reuses the links it found for the same kinds, so the preset no longer builds them again for each module with a list.
 - The graph export guide no longer says that Mortise reads the JSON format. It does not.
+- A folder given as `./Modules` gives the same file paths as `Modules`, in messages and in the baseline.
 
 ## 0.1.0 - 2026-11-24
 
