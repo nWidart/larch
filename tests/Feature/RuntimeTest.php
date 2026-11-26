@@ -91,6 +91,13 @@ it('links a listener to its event, as the app registers it', function () {
         TXT);
 });
 
+it('gives a listener Larch does not read to the module of its namespace', function () {
+    wired()->paths('Modules/Billing')->modules(['Billing' => 'Wired\Billing', 'Inventory' => 'Wired\Inventory']);
+
+    expect(failureOf(fn () => expect(module('Inventory'))->toIgnoreEventsOf(module('Billing'))))
+        ->toContain('Wired\Inventory\Listeners\ReleaseHold listens to Wired\Billing\Events\InvoiceIssued');
+});
+
 it('places a closure listener where it is registered', function () {
     expect(failureOf(fn () => expect(module('Shipping'))->toIgnoreEventsOf(module('Billing'))))
         ->toContain(<<<'TXT'

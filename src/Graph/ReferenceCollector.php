@@ -28,7 +28,9 @@ use SplObjectStorage;
  * Collects the classes a file declares and every class each of them names.
  *
  * Runs after the NameResolver, so class names are fully qualified. Names of
- * functions and constants are skipped, and so is code outside a named class.
+ * functions and constants are skipped. A class named by code outside every
+ * named class, such as a route file, is named by the file itself: the
+ * reference comes from the path of the file.
  *
  * Also collects the calls the runtime pass resolves (static calls, calls to
  * the container, dispatches of jobs) and the places that bind a container
@@ -84,8 +86,9 @@ final class ReferenceCollector extends NodeVisitorAbstract
 
     /**
      * @param  string  $code  the source of the file, to quote calls as written
+     * @param  string  $file  the path of the file, the source of the code outside every named class
      */
-    public function __construct(private readonly string $code = '')
+    public function __construct(private readonly string $code, private readonly string $file)
     {
         $this->skip = new SplObjectStorage;
     }
@@ -127,8 +130,8 @@ final class ReferenceCollector extends NodeVisitorAbstract
             $this->collectMethodCall($node);
         }
 
-        if ($node instanceof FullyQualified && ! isset($this->skip[$node]) && $this->classStack !== []) {
-            $from = $this->currentClass();
+        if ($node instanceof FullyQualified && ! isset($this->skip[$node])) {
+            $from = $this->classStack === [] ? $this->file : $this->currentClass();
             $to = $node->toString();
 
             if ($to !== $from) {
@@ -140,9 +143,10 @@ final class ReferenceCollector extends NodeVisitorAbstract
     }
 
     /**
-     * An import no class of the file uses still makes each class of the file
+     * An import no code of the file uses still makes each class of the file
      * depend on the imported class, at the line of the import, as Mortise
-     * counts it. An import of a namespace, used as Contracts\Prices, is used.
+     * counts it; a file that declares no class depends on it itself. An
+     * import of a namespace, used as Contracts\Prices, is used.
      *
      * @param  array<Node>  $nodes
      */
@@ -161,8 +165,8 @@ final class ReferenceCollector extends NodeVisitorAbstract
                 }
             }
 
-            foreach ($this->declared as $class) {
-                $this->references[] = ['from' => $class, 'to' => $import, 'line' => $line];
+            foreach ($this->declared === [] ? [$this->file] : $this->declared as $from) {
+                $this->references[] = ['from' => $from, 'to' => $import, 'line' => $line];
             }
         }
 

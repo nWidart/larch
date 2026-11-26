@@ -1,6 +1,6 @@
 <?php
 
-use Modules\Shipping\Listeners\CreateShipment;
+use Modules\Billing\Actions\ChargeOrder;
 
-// Code outside a class is not attributed to any class.
-$listener = CreateShipment::class;
+// Code outside a class links from the file, in the module of its folder.
+$action = ChargeOrder::class;

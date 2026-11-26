@@ -29,9 +29,20 @@ A class named in:
 - an attribute;
 - `extends` and `implements`.
 
-An import that no class of the file uses links each class of the file to the imported class.
+An import that no code of the file uses links each class of the file to the imported class.
 An import of a namespace that holds classes, such as `use Modules\Billing\Contracts;`, links nothing by itself. A class used through it, such as `Contracts\Ledger`, is linked.
-Code outside a class, such as a route file, links nothing.
+
+### Code outside a class
+
+A class named outside every named class links from the file, not from a class: route files, config files, a migration that returns `new class extends Migration`, and code beside a class.
+The file's path, relative to the project root, takes the place of the class: `Modules/Audit/routes/web.php uses Modules\Billing\Http\Controllers\InvoiceController`.
+In a file that declares no class, an import that no code uses links the file.
+
+The file belongs to a module by its place. Larch takes the nearest folder above the file that holds a class it reads.
+When every class under that folder belongs to one module, the file belongs to that module: `Modules/Audit/routes/web.php` belongs to Audit when the classes under `Modules/Audit` are those of Audit.
+Otherwise the file belongs to no module, and its links are not checked. A route file of the app, `routes/web.php`, is one.
+
+Larch reads a file only in the [folders it reads](/larch/reference/configuration/#paths). It skips Blade views, `*.blade.php`.
 
 ## `facade`
 

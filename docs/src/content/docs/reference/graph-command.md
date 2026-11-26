@@ -77,7 +77,7 @@ One file that needs no network. It draws the modules and their links, turns each
 | `kinds` | The [link kinds](/larch/reference/link-kinds/) read. `["import"]` with `--imports-only`. |
 | `publicApi` | The public namespaces inside each module. |
 | `modules[]` | Each module: `name`, `namespace`, and `classes`, the number of classes Larch read in it. |
-| `links[]` | Each pair of classes in two modules where the first uses the second, once per kind. |
+| `links[]` | Each pair of classes in two modules where the first uses the second, once per kind. For [code outside a class](/larch/reference/link-kinds/#code-outside-a-class), `from` is the path of the file, relative to the project root. |
 | `links[].public` | Whether `to` is in the public API of `toModule`. |
 | `links[].places[]` | Each place of the link: `file`, `line`, the facade or container key it goes `through`, and where that is bound (`boundIn`). Both are `null` for imports. |
 | `unknown[]` | Each link Larch cannot follow from a class of a module: the class, its module, its place, the `reason`, and `boundIn` when known. |

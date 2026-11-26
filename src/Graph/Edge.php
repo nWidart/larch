@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Nwidart\Larch\Graph;
 
 /**
- * One place where a class reaches another class.
+ * One place where a class, or code outside every class of a file, reaches
+ * another class.
  */
 final readonly class Edge
 {
     /**
+     * @param  string  $from  the class, or the file, relative to the project root, for code outside every class
      * @param  string  $to  empty for an unknown edge
      * @param  string|null  $through  how the link is made, when it is not an import: "the facade App\Facades\Stock"
      * @param  string|null  $boundIn  where the app registers the link: "app/Providers/AppServiceProvider.php:28"

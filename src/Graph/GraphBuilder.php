@@ -6,6 +6,7 @@ namespace Nwidart\Larch\Graph;
 
 use FilesystemIterator;
 use Nwidart\Larch\Exceptions\LarchException;
+use Nwidart\Larch\Support\Path;
 use PhpParser\Error;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
@@ -18,7 +19,8 @@ use SplFileInfo;
 
 /**
  * Reads the PHP files under a set of folders and builds the graph of links
- * between the classes they declare. Nothing is loaded or run.
+ * from the classes they declare, and from the files for code outside every
+ * class. Nothing is loaded or run.
  */
 final class GraphBuilder
 {
@@ -122,7 +124,7 @@ final class GraphBuilder
         // Names are resolved in a first pass, so the collector sees the
         // arguments of a call resolved when it enters the call.
         $ast = (new NodeTraverser(new NameResolver))->traverse($ast);
-        $collector = new ReferenceCollector($code);
+        $collector = new ReferenceCollector($code, $relative);
         (new NodeTraverser($collector))->traverse($ast);
 
         return $collector;
@@ -137,8 +139,13 @@ final class GraphBuilder
         $files = [];
 
         foreach ($paths as $path) {
+            // ./Modules and Modules give one path, so a file has one place.
+            $path = Path::tidy($path);
+
             if (is_file($path)) {
-                $files[] = $path;
+                if (! self::isBlade($path)) {
+                    $files[] = $path;
+                }
 
                 continue;
             }
@@ -152,7 +159,7 @@ final class GraphBuilder
                 $directory,
                 fn (SplFileInfo $item): bool => $item->isDir()
                     ? ! in_array($item->getFilename(), $this->excludedFolders, true)
-                    : $item->getExtension() === 'php',
+                    : $item->getExtension() === 'php' && ! self::isBlade($item->getFilename()),
             );
 
             /** @var SplFileInfo $file */
@@ -167,9 +174,17 @@ final class GraphBuilder
         return $files;
     }
 
+    /**
+     * A Blade view is a template, not PHP. Mortise skips it too.
+     */
+    private static function isBlade(string $path): bool
+    {
+        return str_ends_with($path, '.blade.php');
+    }
+
     private function relative(string $path): string
     {
-        $root = rtrim($this->root, '/').'/';
+        $root = rtrim(Path::tidy($this->root), '/').'/';
 
         return str_starts_with($path, $root) ? substr($path, strlen($root)) : $path;
     }
