@@ -55,7 +55,8 @@ it('records each declared class with its file, and each link with its line', fun
 
     $created = array_values(array_filter($graph->edges, fn (Edge $edge): bool => $edge->to === 'Fixtures\Other\Created'))[0];
 
-    expect($created->line)->toBe(20)
+    expect((new GraphBuilder(__DIR__.'/../Fixtures', []))->build([__DIR__.'/../Fixtures/./references'])->classes)->toBe($graph->classes)
+        ->and($created->line)->toBe(20)
         ->and($created->kind)->toBe(EdgeKind::Import)
         ->and($created->file)->toBe('references/References.php');
 });
@@ -79,7 +80,8 @@ it('skips excluded folders and Blade views', function () {
     $graph = (new GraphBuilder(__DIR__.'/../Fixtures/shop', ['tests']))->build([__DIR__.'/../Fixtures/shop/Modules']);
 
     expect($graph->has('Modules\Billing\Tests\ChargeOrderTest'))->toBeFalse()
-        ->and(referencesOf('references/view.blade.php'))->toBe([]);
+        ->and(referencesOf('references/view.blade.php'))->toBe([])
+        ->and((new GraphBuilder(__DIR__.'/../Fixtures', []))->build([__DIR__.'/../Fixtures/references/view.blade.php'])->edges)->toBe([]);
 });
 
 it('stops with the file and the parser error when a file cannot be parsed', function () {

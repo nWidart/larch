@@ -16,4 +16,17 @@ final class Path
     {
         return preg_match('~^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)~', $path) === 1;
     }
+
+    /**
+     * Drops "." segments and repeated slashes: /app/./Modules//Audit is
+     * /app/Modules/Audit. ".." stays, since a symlink can make it lead
+     * elsewhere.
+     */
+    public static function tidy(string $path): string
+    {
+        $parts = array_filter(explode('/', $path), fn (string $part): bool => $part !== '' && $part !== '.');
+        $tidy = (str_starts_with($path, '/') ? '/' : '').implode('/', $parts);
+
+        return $tidy === '' ? '.' : $tidy;
+    }
 }

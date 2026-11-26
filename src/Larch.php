@@ -320,7 +320,9 @@ final class Larch
         $grouped = [];
 
         foreach ($graph->edgesOf($kinds) as $edge) {
-            $fromModule = $graph->has($edge->from) ? $this->moduleOf($edge->from) : $this->moduleOfFile($edge->file);
+            // Code outside a class links from its file; the runtime pass
+            // links classes, read or not.
+            $fromModule = $edge->from === $edge->file ? $this->moduleOfFile($edge->file) : $this->moduleOf($edge->from);
             $toModule = $this->moduleOf($edge->to);
 
             if ($fromModule === null || $toModule === null || $fromModule === $toModule) {
