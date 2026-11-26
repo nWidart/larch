@@ -47,7 +47,13 @@ A folder or a broken link at the path also stops it. Mortise uses the defaults t
 ## `modules_statuses.json`
 
 Larch reads `modules_statuses.json` at the project root, the file of laravel-modules' file activator.
-A module set to `false` breaks no rule, and no link to it does. Cycles are found among the modules that are on.
+It reads the file as laravel-modules does:
+
+- A module is on only when its entry is `true`. A module without an entry is off, and so is every module of an app without the file.
+- The entry of a module is the key of its name, else the first key that matches the name in any case.
+- An empty file holds no entries. A file that is not a JSON object of module names stops the test.
+
+A module that is off breaks no rule, and no link to it does. Cycles are found among the modules that are on.
 
 ## Shared fixtures
 

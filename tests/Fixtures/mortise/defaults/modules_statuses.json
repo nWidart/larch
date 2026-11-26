@@ -1,0 +1,7 @@
+{
+    "Billing": true,
+    "Catalog": true,
+    "Checkout": true,
+    "Shared": true,
+    "Shipping": true
+}

@@ -65,6 +65,7 @@ To check the same lists on runtime links too, write [`toOnlyDependOn()`](/larch/
 ## Leave a module out
 
 Turn the module off in `modules_statuses.json` at the project root. A module that is off breaks no rule, and no link to it does.
+As in laravel-modules, a module is on only when its entry is `true`: a module without an entry is off.
 
 ## Related
 

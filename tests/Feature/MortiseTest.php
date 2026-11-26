@@ -143,6 +143,50 @@ it('passes the preset when the rules are off', function () {
     expect($run['exit'])->toBe(0)->and($run['output'])->toContain('1 passed');
 });
 
+describe('modules_statuses.json', function () {
+    beforeEach(function () {
+        $this->app = sys_get_temp_dir().'/larch-statuses-'.uniqid();
+        mkdir($this->app);
+    });
+
+    afterEach(function () {
+        if (is_file($this->app.'/modules_statuses.json')) {
+            unlink($this->app.'/modules_statuses.json');
+        }
+        rmdir($this->app);
+    });
+
+    /**
+     * Whether the preset finds the cycle of Checkout and Shipping in the
+     * code of the app defaults, with the given statuses file or none.
+     */
+    function findsCycleWith(string $app, ?string $statuses): bool
+    {
+        if ($statuses !== null) {
+            file_put_contents($app.'/modules_statuses.json', $statuses);
+        }
+
+        $larch = Larch::reset()->root($app)->paths((string) realpath(__DIR__.'/../Fixtures/mortise/defaults/Modules'))->modules('Modules\*');
+
+        return (new MortisePreset($larch))->results()['no-circular-use']->breaches !== [];
+    }
+
+    it('matches the entry of a module as laravel-modules does', function (?string $statuses, bool $on) {
+        expect(findsCycleWith($this->app, $statuses))->toBe($on);
+    })->with([
+        'another case' => ['{"checkout": true, "SHIPPING": true}', true],
+        'the exact name before another case' => ['{"Checkout": true, "shipping": false, "Shipping": true}', true],
+        'a value other than true' => ['{"Checkout": true, "Shipping": 1}', false],
+        'no file' => [null, false],
+        'an empty file' => ['', false],
+        'an empty list' => ['[]', false],
+    ]);
+
+    it('stops on a file laravel-modules does not boot with', function (string $statuses) {
+        expect(fn () => findsCycleWith($this->app, $statuses))->toThrow(LarchException::class, 'modules_statuses.json is not valid');
+    })->with(['{', '[true]', '"on"']);
+});
+
 describe('mortise.json', function () {
     beforeEach(function () {
         $this->app = sys_get_temp_dir().'/larch-mortise-'.uniqid();
